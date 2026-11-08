@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.11",
     "pydantic-settings>=2.12",
     "sqlalchemy[asyncio]>=2.1",
+    "alembic==1.20.1",
     "psycopg[binary,pool]>=3.3",
     "aiosqlite>=0.22",
     "redis>=8.0",
