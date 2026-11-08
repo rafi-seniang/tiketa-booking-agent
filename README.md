@@ -38,6 +38,8 @@ the showtime has started, whose conversation it is, and whether the user said ye
 | Loops and outages | 10 model calls per turn at most, retries for failed and dropped calls, an `error` event otherwise |
 | Long conversations | `SummarizationMiddleware` past 8,000 tokens. The draft is state, so it survives the summary |
 | Restarts, several workers | Conversations are LangGraph checkpoints in Postgres. Redis holds the rate limit (60 requests a minute per API key, `RATE_LIMIT_PER_MINUTE`) and a one-turn-at-a-time lock |
+| Cost per caller | 400,000 model tokens a day per API key on chat turns (`DAILY_TOKENS_PER_CALLER`), counted in Redis. Over it, a turn gets 429 with `Retry-After`. The booking form spends none |
+| Schema changes | Alembic migrations in `migrations/`. The service checks the revision at startup and never changes its own schema |
 | Logs | JSON lines with a request id on every request, next to the traces |
 | Seeing what happened | Every model call, tool call and middleware step traced to a self-hosted Phoenix |
 
@@ -66,6 +68,7 @@ Needs Python 3.12, Docker, and `DEEPSEEK_API_KEY` in `../../secrets/secrets.env`
     python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"     # .venv/bin on Linux and macOS
     cp .env.example .env
     docker compose up -d                  # Postgres :5433, Redis :6383, Phoenix :6006, on 127.0.0.1 only
+    alembic upgrade head                  # the schema. The service refuses to start on an older one
     PYTHONPATH=. python scripts/seed.py   # 21 films, a week of showtimes. Run again any day to extend it
     python main.py                        # http://127.0.0.1:8060/docs
 
@@ -88,6 +91,9 @@ Switch to Gemini with `LLM_MODEL=gemini/gemini-3.8-flash` (reads `GEMINI_API_KEY
 | `POST /v1/sessions/{id}/confirmation` | `{"approved": true}` books the waiting summary, `false` cancels it. Streams like a message |
 | `GET /v1/sessions/{id}` | The conversation: turns, draft, waiting summary, bookings |
 | `GET /v1/movies`, `GET /v1/showtimes?day=`, `GET /v1/showtimes/{id}/seats` | The catalog, for a UI next to the chat |
+| `POST /v1/bookings` | Book from a form: `showtime_id`, `seats`, `customer_name`, and an `Idempotency-Key` header. No model is called |
+| `GET /v1/bookings` | The caller's latest bookings from the chat and the form, newest first, each with its `channel` |
+| `GET /v1/usage` | The caller's chat tokens today against the daily budget |
 | `GET /health`, `GET /meta` | The Lab backend contract |
 
 Events, one JSON object per `data:` line: `token` (a piece of the reply), `tool` (the agent calls a tool), `confirmation`
@@ -103,6 +109,8 @@ keep), `error`, `end` (model calls and tokens of the turn). `/v1` needs `X-API-K
     app/cinema/                 the domain both features use: tables, store, seat layout, seed data
     app/features/chat/          agent, tools, prompt, state, confirmation reader, service, SSE routes
     app/features/catalog/       read-only films, showtimes and seats
+    app/features/bookings/      the booking form: book and list without a model
     scripts/                    seed.py, run_scenarios.py
     evals/                      scenarios, results, what they found
-    tests/                      the real graph with a scripted model, the store, the API
+    migrations/                 Alembic: 0001 the first schema, 0002 booking owner and channel
+    tests/                      the real graph with a scripted model, the store, the API, the migrations
