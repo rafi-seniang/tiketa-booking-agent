@@ -9,8 +9,10 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.cinema.clock import local_day_window
-from app.cinema.schemas import (
+from app.core.database import Sessions
+from app.core.errors import Conflict, NotFound
+from app.models.cinema import BookedSeatRow, BookingRow, MovieRow, ShowtimeRow
+from app.schemas.cinema import (
     Booking,
     BookingRequest,
     Channel,
@@ -20,10 +22,8 @@ from app.cinema.schemas import (
     SeatView,
     Showtime,
 )
-from app.cinema.seat_layout import SEATS_PER_SHOWTIME, seat_rows
-from app.cinema.tables import BookedSeatRow, BookingRow, MovieRow, ShowtimeRow
-from app.core.database import Sessions
-from app.core.errors import Conflict, NotFound
+from app.utils.clock import local_day_window
+from app.utils.seat_layout import SEATS_PER_SHOWTIME, seat_rows
 
 
 def new_booking_code() -> str:

@@ -8,9 +8,9 @@ import asyncio
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app.cinema.seed import seed
 from app.core.database import connect_database
 from app.core.migrations import check_schema
+from app.repositories.seed import seed
 from app.settings import get_settings
 
 

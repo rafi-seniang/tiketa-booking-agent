@@ -8,10 +8,10 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 from litellm.exceptions import MidStreamFallbackError
 
-from app.cinema.schemas import BookingRequest, Showtime
-from app.cinema.store import CinemaStore
 from app.features.chat.agent import build_agent
 from app.features.chat.state import ChatContext
+from app.repositories.cinema import CinemaStore
+from app.schemas.cinema import BookingRequest, Showtime
 from app.settings import Settings
 
 from conftest import CINEMA_TIMEZONE, NOW

@@ -2,8 +2,8 @@ from typing import Any
 
 import httpx
 
-from app.cinema.schemas import Showtime
 from app.core.token_budget import InMemoryTokenBudget
+from app.schemas.cinema import Showtime
 
 from conftest import OWNER, parse_events
 from fakes import ScriptedChatModel, calls, says

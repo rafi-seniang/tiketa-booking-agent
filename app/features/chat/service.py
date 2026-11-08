@@ -12,7 +12,6 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command, StateSnapshot, StreamMode, StreamPart
 
-from app.cinema.store import CinemaStore
 from app.core.errors import Conflict, RateLimited
 from app.core.locks import KeyLock
 from app.core.token_budget import TokenBudget, seconds_to_reset
@@ -20,6 +19,7 @@ from app.features.chat.confirmation import ConfirmationReader
 from app.features.chat.schemas import BookingSummary, ChatEvent, SessionView, TokenUsageView, Turn
 from app.features.chat.session_store import SessionStore
 from app.features.chat.state import ChatContext
+from app.repositories.cinema import CinemaStore
 
 logger = logging.getLogger(__name__)
 

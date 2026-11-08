@@ -6,11 +6,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 
-from app.cinema.schemas import Booking, BookingRequest, CustomerName, SeatIds
-from app.cinema.store import CinemaStore
 from app.core.dependencies import get_now, get_settings, get_store
 from app.core.errors import Conflict
 from app.middleware.rate_limit import caller_of
+from app.repositories.cinema import CinemaStore
+from app.schemas.cinema import Booking, BookingRequest, CustomerName, SeatIds
 from app.settings import Settings
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])

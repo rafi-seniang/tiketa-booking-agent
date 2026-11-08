@@ -3,12 +3,12 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from app.cinema.schemas import BookingRequest, Showtime
-from app.cinema.seat_layout import SEATS_PER_SHOWTIME, seat_map_text
-from app.cinema.seed import seed
-from app.cinema.store import CinemaStore
 from app.core.database import Sessions
 from app.core.errors import Conflict
+from app.repositories.cinema import CinemaStore
+from app.repositories.seed import seed
+from app.schemas.cinema import BookingRequest, Showtime
+from app.utils.seat_layout import SEATS_PER_SHOWTIME, seat_map_text
 
 from conftest import CINEMA_TIMEZONE, DUNE, NOW
 

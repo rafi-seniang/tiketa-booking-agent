@@ -5,9 +5,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.cinema.schemas import Movie, SeatMap, Showtime
-from app.cinema.store import CinemaStore
 from app.core.dependencies import get_now, get_store
+from app.repositories.cinema import CinemaStore
+from app.schemas.cinema import Movie, SeatMap, Showtime
 
 router = APIRouter(tags=["catalog"])
 Store = Annotated[CinemaStore, Depends(get_store)]

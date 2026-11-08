@@ -4,10 +4,10 @@ import httpx
 import pytest
 from langchain_core.messages import ToolMessage
 
-from app.cinema.schemas import Showtime
-from app.cinema.seat_layout import ROWS_FRONT_TO_BACK
-from app.cinema.store import CinemaStore
 from app.features.chat.service import ChatService
+from app.repositories.cinema import CinemaStore
+from app.schemas.cinema import Showtime
+from app.utils.seat_layout import ROWS_FRONT_TO_BACK
 
 from conftest import OWNER, FakeReader, parse_events
 from fakes import ScriptedChatModel, calls, says

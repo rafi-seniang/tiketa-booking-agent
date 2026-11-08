@@ -5,10 +5,10 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from app.cinema.store import CinemaStore
 from app.core.errors import RateLimited
 from app.core.lifespan import Resources
 from app.middleware.rate_limit import RateLimiter, caller_of
+from app.repositories.cinema import CinemaStore
 from app.settings import Settings
 
 

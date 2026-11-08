@@ -7,7 +7,6 @@ from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
 
-from app.cinema.store import CinemaStore
 from app.core.checkpoints import open_checkpointer
 from app.core.database import connect_database
 from app.core.locks import InMemoryKeyLock, KeyLock, RedisKeyLock
@@ -21,6 +20,7 @@ from app.features.chat.confirmation import ConfirmationReader
 from app.features.chat.service import ChatService
 from app.features.chat.session_store import SessionStore
 from app.middleware.rate_limit import InMemoryRateLimiter, RateLimiter, RedisRateLimiter
+from app.repositories.cinema import CinemaStore
 from app.settings import Settings
 
 

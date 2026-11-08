@@ -6,9 +6,9 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
-from app.cinema.clock import local_day_window
-from app.cinema.tables import MovieRow, ShowtimeRow
 from app.core.database import Sessions
+from app.models.cinema import MovieRow, ShowtimeRow
+from app.utils.clock import local_day_window
 
 TMDB = "https://image.tmdb.org/t/p/original"
 

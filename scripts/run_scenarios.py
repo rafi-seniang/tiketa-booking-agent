@@ -19,9 +19,9 @@ import httpx
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
-from app.cinema.clock import local_text
 from app.engines.llm import build_chat_model
 from app.settings import get_settings
+from app.utils.clock import local_text
 
 SCENARIOS = Path("evals/scenarios.json")
 RESULTS = Path("evals/results")

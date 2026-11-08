@@ -22,13 +22,13 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
-from app.cinema.schemas import Movie
-from app.cinema.store import CinemaStore
 from app.core.errors import Conflict, NotFound
 from app.engines.llm import STREAM_DROPPED_ERRORS
 from app.features.chat.prompt import system_prompt, turn_context
 from app.features.chat.state import ChatContext, Draft, TiketaState
 from app.features.chat.tools import build_tools
+from app.repositories.cinema import CinemaStore
+from app.schemas.cinema import Movie
 from app.settings import Settings
 
 

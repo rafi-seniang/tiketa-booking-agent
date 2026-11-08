@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field
 
-from app.cinema.seat_layout import AISLE_AFTER_SEAT, ALL_SEAT_IDS, WALKWAY_BEFORE_ROW
+from app.utils.seat_layout import AISLE_AFTER_SEAT, ALL_SEAT_IDS, WALKWAY_BEFORE_ROW
 
 
 def known_seat_id(seat_id: str) -> str:

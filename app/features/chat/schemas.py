@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app.cinema.schemas import Booking
+from app.schemas.cinema import Booking
 
 
 class MessageIn(BaseModel):

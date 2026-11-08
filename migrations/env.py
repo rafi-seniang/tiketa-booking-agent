@@ -9,7 +9,6 @@ import asyncio
 from alembic import context
 from sqlalchemy import Connection
 
-import app.cinema.tables
 import app.features.chat.session_store  # noqa: F401  the tables register on Base.metadata when imported
 from app.core.database import Base, connect_database
 from app.settings import get_settings

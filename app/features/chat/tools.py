@@ -9,13 +9,13 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel, Field
 
-from app.cinema.clock import local_text
-from app.cinema.schemas import BookingRequest, CustomerName, SeatIds, Showtime
-from app.cinema.seat_layout import SEAT_MAP_LEGEND, seat_map_text
-from app.cinema.store import CinemaStore
 from app.core.errors import Conflict
 from app.features.chat.schemas import BookingSummary, ConfirmationAnswer
 from app.features.chat.state import CLEARED_AFTER_BOOKING, ChatContext, Draft, TiketaState, merge_draft, missing_fields
+from app.repositories.cinema import CinemaStore
+from app.schemas.cinema import BookingRequest, CustomerName, SeatIds, Showtime
+from app.utils.clock import local_text
+from app.utils.seat_layout import SEAT_MAP_LEGEND, seat_map_text
 
 Runtime = ToolRuntime[ChatContext, TiketaState]
 

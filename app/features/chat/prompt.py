@@ -7,9 +7,9 @@ already seen. DeepSeek and Gemini then read that start from their prompt cache, 
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app.cinema.clock import local_text
-from app.cinema.schemas import Movie
 from app.features.chat.state import Draft, missing_fields
+from app.schemas.cinema import Movie
+from app.utils.clock import local_text
 
 PROMPT = """You are the ticket assistant of {cinema_name}, a cinema in Jakarta. You help people find films and \
 showtimes, choose seats and book tickets. Reply in the language of the user's latest message, also when tool results \
