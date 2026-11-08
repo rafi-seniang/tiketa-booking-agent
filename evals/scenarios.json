@@ -63,6 +63,30 @@
     "bookings": 0
   },
   {
+    "name": "step by step: film, then time, then seats, then name",
+    "turns": [
+      {"say": "mau nonton interstellar", "forbid": ["confirmation", "booking"],
+       "expect": "Asks which day or time, or offers Interstellar's showtimes. Books nothing."},
+      {"say": "besok aja, yang jam 18.00", "forbid": ["confirmation", "booking"],
+       "expect": "Takes Interstellar tomorrow at 18:00 and asks for what is still missing (seats, name). Does not show a summary yet."},
+      {"say": "kursi G10 sama G11", "forbid": ["confirmation", "booking"],
+       "expect": "Takes G10 and G11, or says they are taken, and asks for the name on the booking."},
+      {"say": "atas nama Nadia", "events": ["confirmation"], "forbid": ["booking"],
+       "expect": "Prepares Interstellar tomorrow at 18:00, seats G10 and G11, name Nadia, and asks for confirmation."}
+    ],
+    "bookings": 0
+  },
+  {
+    "name": "seats named before the showtime",
+    "turns": [
+      {"say": "mau nonton parasite, kursinya H9 sama H10 ya", "forbid": ["confirmation", "booking"],
+       "expect": "Asks which day and time, or offers Parasite's showtimes. Does not invent a showtime and books nothing."},
+      {"say": "besok yang paling malem, atas nama Joko", "events": ["confirmation"], "forbid": ["booking"],
+       "expect": "Takes Parasite tomorrow at its latest showtime, keeps the seats H9 and H10 asked for earlier (or says if they are taken), and asks for confirmation."}
+    ],
+    "bookings": 0
+  },
+  {
     "name": "seats described in words",
     "turns": [
       {"say": "dune besok yang 20.45, 3 kursi paling belakang deket lorong, atas nama Budi", "events": ["confirmation"],

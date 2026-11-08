@@ -1,6 +1,6 @@
 # Scenario evaluation
 
-`scripts/run_scenarios.py` plays the eleven conversations in `scenarios.json` (19 turns, Indonesian and English) against
+`scripts/run_scenarios.py` plays the thirteen conversations in `scenarios.json` (25 turns, Indonesian and English) against
 a running service, with real DeepSeek calls. Each turn is checked twice:
 
 - **In code:** the events the turn must produce (`confirmation`, `booking`), the events it must not produce (a
@@ -28,6 +28,13 @@ On Sunday the user asks for Dune "lusa" at 18:00 (Tuesday), then types "gajadi d
 jam paling malamnya, jumlah kursinya sama tapi di belakang" instead of confirming. All four runs booked nothing, moved
 to Monday 20:45 (Dune's latest showtime that day), kept two seats and picked M8 and M9 three times and M10 and M11
 once, in the back row by the aisle. Each run sent only the summary, with no sentence beside it.
+
+Two step-by-step conversations were added and run twice each, all turns passing and read by hand. "Film, then time,
+then seats, then name" asked for each missing piece in turn and showed the summary only once the name came. "Seats
+named before the showtime" asks for Parasite with H9 and H10 and no time. The agent asked for the time and said it
+would check those seats then. The code refuses seats before a showtime, because which seats are free depends on the
+showtime. On "besok yang paling malem" it took Monday 21:15 and set H9 and H10 from the earlier message. It did not
+mention that the aisle runs between H9 and H10.
 
 Full rows, with every reply and verdict: `results/2026-11-08-deepseek-flash-thinking-low.json` and
 `results/2026-11-08-deepseek-flash-thinking-off.json`.
