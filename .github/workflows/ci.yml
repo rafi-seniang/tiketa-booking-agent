@@ -18,6 +18,18 @@ jobs:
       - run: mypy
       # tests use a scripted model and SQLite: no API key, no services
       - run: pytest -q
+      # known vulnerabilities in any dependency fail the build, except the reviewed ones in .pip-audit-ignore
+      - run: pip-audit --skip-editable $(grep -v '^#' .pip-audit-ignore | sed 's/^/--ignore-vuln /')
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # every commit, not only the last one
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   image:
     needs: check
