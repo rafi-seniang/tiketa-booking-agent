@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.cinema.clock import local_day_window
 from app.cinema.tables import MovieRow, ShowtimeRow
-from app.platform.database import Sessions
+from app.core.database import Sessions
 
 TMDB = "https://image.tmdb.org/t/p/original"
 

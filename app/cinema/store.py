@@ -22,8 +22,8 @@ from app.cinema.schemas import (
 )
 from app.cinema.seat_layout import SEATS_PER_SHOWTIME, seat_rows
 from app.cinema.tables import BookedSeatRow, BookingRow, MovieRow, ShowtimeRow
-from app.platform.database import Sessions
-from app.platform.errors import Conflict, NotFound
+from app.core.database import Sessions
+from app.core.errors import Conflict, NotFound
 
 
 def new_booking_code() -> str:

@@ -4,10 +4,10 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from app.core.dependencies import get_resources
+from app.core.lifespan import Resources
 from app.features.chat.controller import ChatController
 from app.features.chat.service import ChatService
-from app.platform.dependencies import get_resources
-from app.platform.resources import Resources
 
 
 def get_chat_service(resources: Annotated[Resources, Depends(get_resources)]) -> ChatService:

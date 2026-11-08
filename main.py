@@ -3,7 +3,7 @@
 
 import uvicorn
 
-from app.bootstrap import create_app
+from app.core.application import create_app
 
 app = create_app()
 

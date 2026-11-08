@@ -6,8 +6,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
 
-from app.platform.dependencies import get_settings
-from config.settings import Settings
+from app.core.dependencies import get_settings
+from app.settings import Settings
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 

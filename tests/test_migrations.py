@@ -6,7 +6,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 
-from app.platform.migrations import ALEMBIC_INI
+from app.core.migrations import ALEMBIC_INI
 
 
 def alembic_config(database: Path) -> Config:

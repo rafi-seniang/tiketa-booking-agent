@@ -9,9 +9,9 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.cinema.seed import seed
-from app.platform.database import connect_database
-from app.platform.migrations import check_schema
-from config.settings import get_settings
+from app.core.database import connect_database
+from app.core.migrations import check_schema
+from app.settings import get_settings
 
 
 async def main() -> None:

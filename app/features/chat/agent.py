@@ -24,12 +24,12 @@ from langgraph.types import Command
 
 from app.cinema.schemas import Movie
 from app.cinema.store import CinemaStore
+from app.core.errors import Conflict, NotFound
 from app.engines.llm import STREAM_DROPPED_ERRORS
 from app.features.chat.prompt import system_prompt, turn_context
 from app.features.chat.state import ChatContext, Draft, TiketaState
 from app.features.chat.tools import build_tools
-from app.platform.errors import Conflict, NotFound
-from config.settings import Settings
+from app.settings import Settings
 
 
 @wrap_tool_call

@@ -1,20 +1,20 @@
-"""The app factory: settings, logging, middleware, error handlers, then one router per feature."""
+"""The app factory: settings, logging, middleware, error handlers, then the routes."""
 
 from fastapi import APIRouter, Depends, FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from app import VERSION
+from app.core.dependencies import enforce_rate_limit
+from app.core.errors import register_error_handlers
+from app.core.lifespan import lifespan
+from app.core.logging import configure_logging
 from app.features.bookings import router as bookings
 from app.features.catalog import router as catalog
 from app.features.chat import router as chat
 from app.features.health import router as health
-from app.platform.dependencies import enforce_rate_limit
-from app.platform.errors import register_error_handlers
-from app.platform.middleware import register_middleware
-from app.platform.resources import lifespan
-from app.platform.security import require_api_key
-from config.logging import configure_logging
-from config.settings import Settings, get_settings
+from app.middleware.auth import require_api_key
+from app.middleware.cors import add_cors
+from app.middleware.request_log import register_middleware
+from app.settings import Settings, get_settings
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -29,13 +29,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     register_middleware(app)
     register_error_handlers(app)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_methods=["GET", "POST"],
-        allow_headers=["*"],
-        expose_headers=["Retry-After"],
-    )
+    add_cors(app, settings.cors_origins)
 
     # Key first, then the rate limit, so an unknown caller never spends a known caller's budget
     api = APIRouter(prefix="/v1", dependencies=[Depends(require_api_key), Depends(enforce_rate_limit)])

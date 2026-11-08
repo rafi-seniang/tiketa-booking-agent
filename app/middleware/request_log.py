@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
 
-from config.logging import request_id
+from app.core.logging import request_id
 
 logger = logging.getLogger("app.access")
 

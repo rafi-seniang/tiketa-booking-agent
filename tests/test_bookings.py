@@ -3,7 +3,7 @@ from typing import Any
 import httpx
 
 from app.cinema.schemas import Showtime
-from app.platform.token_budget import InMemoryTokenBudget
+from app.core.token_budget import InMemoryTokenBudget
 
 from conftest import OWNER, parse_events
 from fakes import ScriptedChatModel, calls, says

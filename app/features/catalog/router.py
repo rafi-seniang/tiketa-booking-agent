@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 
 from app.cinema.schemas import Movie, SeatMap, Showtime
 from app.cinema.store import CinemaStore
-from app.platform.dependencies import get_now, get_store
+from app.core.dependencies import get_now, get_store
 
 router = APIRouter(tags=["catalog"])
 Store = Annotated[CinemaStore, Depends(get_store)]

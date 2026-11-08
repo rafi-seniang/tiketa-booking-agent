@@ -6,7 +6,6 @@ ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 COPY pyproject.toml ./
 COPY main.py ./
 COPY app ./app
-COPY config ./config
 COPY alembic.ini ./
 COPY migrations ./migrations
 RUN pip wheel --wheel-dir /wheels .

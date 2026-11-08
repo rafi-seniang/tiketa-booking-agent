@@ -6,10 +6,10 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from app.cinema.store import CinemaStore
-from app.platform.errors import RateLimited
-from app.platform.rate_limit import RateLimiter, caller_of
-from app.platform.resources import Resources
-from config.settings import Settings
+from app.core.errors import RateLimited
+from app.core.lifespan import Resources
+from app.middleware.rate_limit import RateLimiter, caller_of
+from app.settings import Settings
 
 
 def get_resources(request: Request) -> Resources:

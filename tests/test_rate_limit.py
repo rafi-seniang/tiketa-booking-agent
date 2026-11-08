@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from app.platform import rate_limit
-from config.settings import Settings
+from app.middleware import rate_limit
+from app.settings import Settings
 
 
 @pytest.fixture

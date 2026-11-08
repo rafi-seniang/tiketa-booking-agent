@@ -7,8 +7,8 @@ from app.cinema.schemas import BookingRequest, Showtime
 from app.cinema.seat_layout import SEATS_PER_SHOWTIME, seat_map_text
 from app.cinema.seed import seed
 from app.cinema.store import CinemaStore
-from app.platform.database import Sessions
-from app.platform.errors import Conflict
+from app.core.database import Sessions
+from app.core.errors import Conflict
 
 from conftest import CINEMA_TIMEZONE, DUNE, NOW
 

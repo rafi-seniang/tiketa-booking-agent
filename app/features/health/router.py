@@ -5,9 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app import VERSION
+from app.core.dependencies import get_resources
+from app.core.lifespan import Resources
 from app.features.health.schemas import ServiceMeta
-from app.platform.dependencies import get_resources
-from app.platform.resources import Resources
 
 router = APIRouter(tags=["health"])
 

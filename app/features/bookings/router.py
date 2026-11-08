@@ -8,10 +8,10 @@ from pydantic import BaseModel
 
 from app.cinema.schemas import Booking, BookingRequest, CustomerName, SeatIds
 from app.cinema.store import CinemaStore
-from app.platform.dependencies import get_now, get_settings, get_store
-from app.platform.errors import Conflict
-from app.platform.rate_limit import caller_of
-from config.settings import Settings
+from app.core.dependencies import get_now, get_settings, get_store
+from app.core.errors import Conflict
+from app.middleware.rate_limit import caller_of
+from app.settings import Settings
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 Store = Annotated[CinemaStore, Depends(get_store)]

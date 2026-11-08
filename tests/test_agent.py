@@ -12,7 +12,7 @@ from app.cinema.schemas import BookingRequest, Showtime
 from app.cinema.store import CinemaStore
 from app.features.chat.agent import build_agent
 from app.features.chat.state import ChatContext
-from config.settings import Settings
+from app.settings import Settings
 
 from conftest import CINEMA_TIMEZONE, NOW
 from fakes import ScriptedChatModel, calls, says

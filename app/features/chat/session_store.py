@@ -6,8 +6,8 @@ from datetime import datetime
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.platform.database import Base, Sessions, UtcDateTime
-from app.platform.errors import NotFound
+from app.core.database import Base, Sessions, UtcDateTime
+from app.core.errors import NotFound
 
 
 class ChatSessionRow(Base):

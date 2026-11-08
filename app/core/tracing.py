@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from phoenix.otel import register
 
-from config.settings import Settings
+from app.settings import Settings
 
 
 def start_tracing(settings: Settings) -> Callable[[], None] | None:

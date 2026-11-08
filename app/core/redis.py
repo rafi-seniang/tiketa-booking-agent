@@ -4,7 +4,7 @@ import logging
 
 from redis.asyncio import Redis
 
-from config.settings import Settings
+from app.settings import Settings
 
 logger = logging.getLogger(__name__)
 

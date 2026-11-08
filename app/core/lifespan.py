@@ -8,20 +8,20 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI
 
 from app.cinema.store import CinemaStore
+from app.core.checkpoints import open_checkpointer
+from app.core.database import connect_database
+from app.core.locks import InMemoryKeyLock, KeyLock, RedisKeyLock
+from app.core.migrations import check_schema
+from app.core.redis import connect_redis
+from app.core.token_budget import InMemoryTokenBudget, RedisTokenBudget, TokenBudget
+from app.core.tracing import start_tracing
 from app.engines.llm import build_chat_model
 from app.features.chat.agent import build_agent
 from app.features.chat.confirmation import ConfirmationReader
 from app.features.chat.service import ChatService
 from app.features.chat.session_store import SessionStore
-from app.platform.checkpoints import open_checkpointer
-from app.platform.database import connect_database
-from app.platform.locks import InMemoryKeyLock, KeyLock, RedisKeyLock
-from app.platform.migrations import check_schema
-from app.platform.rate_limit import InMemoryRateLimiter, RateLimiter, RedisRateLimiter
-from app.platform.redis import connect_redis
-from app.platform.token_budget import InMemoryTokenBudget, RedisTokenBudget, TokenBudget
-from app.platform.tracing import start_tracing
-from config.settings import Settings
+from app.middleware.rate_limit import InMemoryRateLimiter, RateLimiter, RedisRateLimiter
+from app.settings import Settings
 
 
 @dataclass

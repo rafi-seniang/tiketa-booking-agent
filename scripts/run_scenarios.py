@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 
 from app.cinema.clock import local_text
 from app.engines.llm import build_chat_model
-from config.settings import get_settings
+from app.settings import get_settings
 
 SCENARIOS = Path("evals/scenarios.json")
 RESULTS = Path("evals/results")

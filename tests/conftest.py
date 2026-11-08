@@ -10,21 +10,21 @@ import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
 
-from app.bootstrap import create_app
 from app.cinema.schemas import Showtime
 from app.cinema.seed import seed
 from app.cinema.store import CinemaStore
+from app.core.application import create_app
+from app.core.database import Base, Sessions, connect_database
+from app.core.dependencies import get_now, get_resources
+from app.core.lifespan import Resources
+from app.core.locks import InMemoryKeyLock
+from app.core.token_budget import InMemoryTokenBudget
 from app.features.chat.agent import build_agent
 from app.features.chat.schemas import BookingSummary
 from app.features.chat.service import ChatService
 from app.features.chat.session_store import SessionStore
-from app.platform.database import Base, Sessions, connect_database
-from app.platform.dependencies import get_now, get_resources
-from app.platform.locks import InMemoryKeyLock
-from app.platform.rate_limit import InMemoryRateLimiter
-from app.platform.resources import Resources
-from app.platform.token_budget import InMemoryTokenBudget
-from config.settings import Settings
+from app.middleware.rate_limit import InMemoryRateLimiter
+from app.settings import Settings
 
 from fakes import ScriptedChatModel
 

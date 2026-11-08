@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import JSON, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.platform.database import Base, UtcDateTime
+from app.core.database import Base, UtcDateTime
 
 
 class MovieRow(Base):

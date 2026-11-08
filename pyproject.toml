@@ -39,7 +39,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["app*", "config*"]
+include = ["app*"]
 
 [tool.setuptools]
 py-modules = ["main"]
@@ -63,7 +63,7 @@ ignore = ["S101"]  # asserts are fine in tests
 
 [tool.mypy]
 python_version = "3.12"
-files = ["main.py", "app", "config", "scripts"]
+files = ["main.py", "app", "scripts"]
 strict = true
 plugins = ["pydantic.mypy"]
 

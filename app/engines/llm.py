@@ -4,7 +4,7 @@ import litellm
 from langchain_litellm import ChatLiteLLM
 from litellm.exceptions import MidStreamFallbackError
 
-from config.settings import Settings
+from app.settings import Settings
 
 # LiteLLM prints a provider list to stderr whenever its own cost lookup misses a name. Our errors are logged anyway
 litellm.suppress_debug_info = True
