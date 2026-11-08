@@ -1,6 +1,6 @@
 # Scenario evaluation
 
-`scripts/run_scenarios.py` plays the ten conversations in `scenarios.json` (17 turns, Indonesian and English) against
+`scripts/run_scenarios.py` plays the eleven conversations in `scenarios.json` (19 turns, Indonesian and English) against
 a running service, with real DeepSeek calls. Each turn is checked twice:
 
 - **In code:** the events the turn must produce (`confirmation`, `booking`), the events it must not produce (a
@@ -23,6 +23,12 @@ three times each, thinking off picked M16 to M18 (against the wall) twice and a 
 M7 to M9 (next to the aisle) all three times. Reading a text seat map for "next to each other" and "by the aisle" is
 where the small model needs to think. Input tokens dominate the cost and barely change, so thinking is the default.
 
+Later the same day, "moves to another day while the summary waits" was added and run four times with thinking `low`.
+On Sunday the user asks for Dune "lusa" at 18:00 (Tuesday), then types "gajadi deh, besok aja untuk film yang sama di
+jam paling malamnya, jumlah kursinya sama tapi di belakang" instead of confirming. All four runs booked nothing, moved
+to Monday 20:45 (Dune's latest showtime that day), kept two seats and picked M8 and M9 three times and M10 and M11
+once, in the back row by the aisle. Each run sent only the summary, with no sentence beside it.
+
 Full rows, with every reply and verdict: `results/2026-11-08-deepseek-flash-thinking-low.json` and
 `results/2026-11-08-deepseek-flash-thinking-off.json`.
 
@@ -37,6 +43,7 @@ Full rows, with every reply and verdict: `results/2026-11-08-deepseek-flash-thin
 | DeepSeek closed one stream after 19 s ("Connection closed"). `ChatLiteLLM` retries only calls that fail to start | `ModelRetryMiddleware` tries a dropped stream once more, then fails the turn |
 | A scenario asked for seat F12, which the previous run had already booked | Scenarios that end in a booking let the agent pick a free seat, so runs do not depend on each other |
 | The judge passed the English reply above | Its prompt checks the language first |
+| The judge failed a correct "lusa" then "besok" reply, because it did not know today's date | Its prompt gets the current time in the cinema's timezone |
 | "Kursi tengah" gave F4 and F5, a middle row but the left side | The seat map's legend states where the aisle, the walls and the centre are. The layout is data the model was missing. With it, the agent also pointed out that E9 and E10, which a scenario asked for, sit across the aisle (the scenario now asks for E7 and E8) |
 
 ## Limits
