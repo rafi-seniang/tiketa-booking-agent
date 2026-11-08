@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=60, gt=0)
     # Model tokens (input and output) per caller per UTC day on chat turns. A turn starts only below it
     daily_tokens_per_caller: int = Field(default=400_000, gt=0)
+    # Model tokens for all callers together per UTC day: the most the chat can spend in a day, whoever calls
+    daily_tokens_total: int = Field(default=3_000_000, gt=0)
     # How long a turn may hold its conversation before the lock expires on its own (a crashed worker)
     turn_lock_seconds: int = Field(default=180, gt=0)
 

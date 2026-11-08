@@ -93,3 +93,13 @@ async def test_chat_turns_stop_when_the_days_tokens_are_used_up(
     refused = await client.post(f"/v1/sessions/{session_id}/messages", json={"message": "halo lagi"})
     assert refused.status_code == 429 and int(refused.headers["Retry-After"]) > 0
     assert "used up" in refused.json()["detail"]
+
+
+async def test_the_chat_closes_for_everyone_at_the_days_total_and_the_form_still_books(
+    client: httpx.AsyncClient, budget: InMemoryTokenBudget, dune_today: list[Showtime]
+) -> None:
+    session_id = (await client.post("/v1/sessions")).json()["session_id"]
+    await budget.add("guest:many-other-callers", 50_000)
+    refused = await client.post(f"/v1/sessions/{session_id}/messages", json={"message": "halo"})
+    assert refused.status_code == 429 and "closed for today" in refused.json()["detail"]
+    assert (await book_on_form(client, form_booking(dune_today[2], ["J1"]))).status_code == 201

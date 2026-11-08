@@ -112,7 +112,7 @@ def chat(
     budget: InMemoryTokenBudget,
 ) -> ChatService:
     reader_any: Any = reader  # FakeReader has the reader's one method
-    return ChatService(agent, reader_any, SessionStore(sessions), store, InMemoryKeyLock(), 60, budget, 10_000)
+    return ChatService(agent, reader_any, SessionStore(sessions), store, InMemoryKeyLock(), 60, budget, 10_000, 50_000)
 
 
 @pytest.fixture
