@@ -52,6 +52,17 @@
     "bookings": 0
   },
   {
+    "name": "moves to another day while the summary waits",
+    "turns": [
+      {"say": "dune lusa jam 18.00, 2 kursi F8 sama F9, atas nama Rafi", "events": ["confirmation"],
+       "expect": "Prepares the booking for Dune: Part Two the day after tomorrow at 18:00 with F8 and F9 and asks for confirmation."},
+      {"say": "eh gajadi deh, besok aja untuk film yang sama di jam paling malamnya, jumlah kursinya sama tapi di belakang",
+       "events": ["confirmation"], "forbid": ["booking"],
+       "expect": "Does not book the first summary. Moves to Dune: Part Two tomorrow (not the day after) at its latest showtime, picks two free adjacent seats in a back row (L or M), says which, and asks for confirmation again."}
+    ],
+    "bookings": 0
+  },
+  {
     "name": "seats described in words",
     "turns": [
       {"say": "dune besok yang 20.45, 3 kursi paling belakang deket lorong, atas nama Budi", "events": ["confirmation"],

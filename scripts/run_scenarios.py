@@ -13,11 +13,13 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 import httpx
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
+from app.cinema.clock import local_text
 from app.engines.llm import build_chat_model
 from config.settings import get_settings
 
@@ -25,6 +27,7 @@ SCENARIOS = Path("evals/scenarios.json")
 RESULTS = Path("evals/results")
 
 JUDGE_PROMPT = """You review a cinema ticket assistant. Judge only its latest reply. The history gives context.
+Now, in the cinema's timezone: {now_local}. Read dates such as "besok" or "lusa" from this.
 First check the language: the reply must be in the language of the user's latest message.
 The assistant can find showtimes, read seat maps and prepare a booking. The system then shows the user a summary to
 confirm or cancel, and books only after that. Events the system sent in this turn: {events}.
@@ -97,7 +100,8 @@ async def play(client: httpx.AsyncClient, scenario: Scenario, judge: Any) -> lis
             "usage": events[-1].get("data") if events else None,
         }
         if judge is not None:
-            prompt = JUDGE_PROMPT.format(events=", ".join(types) or "none", expected=turn.expect)
+            now_local = local_text(datetime.now(UTC), ZoneInfo(get_settings().cinema_timezone))
+            prompt = JUDGE_PROMPT.format(now_local=now_local, events=", ".join(types) or "none", expected=turn.expect)
             conversation = "\n".join([*history, f"USER: {user}", f"ASSISTANT: {reply}"])
             verdict = await judge.ainvoke([SystemMessage(prompt), HumanMessage(conversation)])
             row["verdict"], row["reasoning"] = verdict.verdict, verdict.reasoning
