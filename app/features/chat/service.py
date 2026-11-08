@@ -44,16 +44,23 @@ class TurnUsage:
     def __init__(self) -> None:
         self.model_calls = 0
         self.input_tokens = 0
+        self.cached_input_tokens = 0  # read from the provider's prompt cache, billed at a lower rate
         self.output_tokens = 0
 
     def add(self, message: AIMessage) -> None:
         self.model_calls += 1
         if message.usage_metadata is not None:
             self.input_tokens += message.usage_metadata["input_tokens"]
+            self.cached_input_tokens += message.usage_metadata.get("input_token_details", {}).get("cache_read") or 0
             self.output_tokens += message.usage_metadata["output_tokens"]
 
     def as_data(self) -> dict[str, int]:
-        return {"model_calls": self.model_calls, "input_tokens": self.input_tokens, "output_tokens": self.output_tokens}
+        return {
+            "model_calls": self.model_calls,
+            "input_tokens": self.input_tokens,
+            "cached_input_tokens": self.cached_input_tokens,
+            "output_tokens": self.output_tokens,
+        }
 
 
 def events_of(part: StreamPart[Any, Any], usage: TurnUsage) -> list[ChatEvent]:

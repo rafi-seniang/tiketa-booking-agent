@@ -109,7 +109,7 @@ async def test_a_failed_turn_says_so_and_the_conversation_carries_on(
 
     events = await send(client, session_id, "halo")
     assert [event["type"] for event in events] == ["message", "end"]
-    unfinished_call_answer = model.received[-1][-2]
+    unfinished_call_answer = model.received[-1][-3]  # before the new message and the turn context
     assert isinstance(unfinished_call_answer, ToolMessage) and "previous turn failed" in unfinished_call_answer.text
 
 

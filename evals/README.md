@@ -36,6 +36,15 @@ would check those seats then. The code refuses seats before a showtime, because 
 showtime. On "besok yang paling malem" it took Monday 21:15 and set H9 and H10 from the earlier message. It did not
 mention that the aisle runs between H9 and H10.
 
+### Prompt cache
+
+DeepSeek reads a request's start from its prompt cache when an earlier request began with the same text, and bills
+those tokens at a lower rate. The prompt used to carry the time and the booking draft near its top, so every change of
+minute or draft ended the shared start there. Now the rules and films are a fixed system prompt, and the time and draft
+go in a system message after the conversation, sent with the call and not saved. On "film, then time, then seats, then
+name" the share of input tokens read from the cache went from 59% (11,776 of 20,077) to 84% (20,096 of 24,060). On all
+thirteen conversations it was 80% (123,136 of 154,765), with 25 of 25 turns passing in code and with the judge.
+
 Full rows, with every reply and verdict: `results/2026-11-08-deepseek-flash-thinking-low.json` and
 `results/2026-11-08-deepseek-flash-thinking-off.json`.
 

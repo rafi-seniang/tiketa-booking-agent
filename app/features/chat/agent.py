@@ -9,14 +9,15 @@ from langchain.agents.middleware import (
     AgentMiddleware,
     ModelCallLimitMiddleware,
     ModelRequest,
+    ModelResponse,
     ModelRetryMiddleware,
     SummarizationMiddleware,
     ToolCallRequest,
-    dynamic_prompt,
+    wrap_model_call,
     wrap_tool_call,
 )
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import SystemMessage, ToolMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
@@ -24,7 +25,7 @@ from langgraph.types import Command
 from app.cinema.schemas import Movie
 from app.cinema.store import CinemaStore
 from app.engines.llm import STREAM_DROPPED_ERRORS
-from app.features.chat.prompt import movie_lines, system_prompt
+from app.features.chat.prompt import system_prompt, turn_context
 from app.features.chat.state import ChatContext, Draft, TiketaState
 from app.features.chat.tools import build_tools
 from app.platform.errors import Conflict, NotFound
@@ -50,19 +51,14 @@ def build_agent(
     cinema_timezone: ZoneInfo,
     checkpointer: BaseCheckpointSaver[Any],
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
-    movies_text = movie_lines(movies)  # the films are loaded once at startup
-
-    @dynamic_prompt
-    def tiketa_prompt(request: ModelRequest[ChatContext]) -> str:
+    @wrap_model_call
+    async def add_turn_context(
+        request: ModelRequest[ChatContext], handler: Callable[[ModelRequest[ChatContext]], Awaitable[ModelResponse]]
+    ) -> ModelResponse:
+        """The time and the draft go after the conversation, for this call only. They are not saved in the state."""
         state = cast(TiketaState, request.state)  # the agent runs with state_schema=TiketaState
-        return system_prompt(
-            movies_text,
-            state.get("draft") or Draft(),
-            request.runtime.context.now,
-            settings.cinema_name,
-            cinema_timezone,
-            settings.max_seats_per_booking,
-        )
+        context = turn_context(state.get("draft") or Draft(), request.runtime.context.now, cinema_timezone)
+        return await handler(request.override(messages=[*request.messages, SystemMessage(context)]))
 
     middleware: list[AgentMiddleware[Any, Any, Any]] = [
         SummarizationMiddleware(
@@ -71,13 +67,14 @@ def build_agent(
             keep=("messages", settings.messages_kept_after_summary),
         ),
         ModelCallLimitMiddleware(run_limit=settings.max_model_calls_per_turn, exit_behavior="error"),
-        tiketa_prompt,
+        add_turn_context,
         # One more try when the provider drops a stream half way. A second failure fails the turn
         ModelRetryMiddleware(max_retries=1, retry_on=STREAM_DROPPED_ERRORS, on_failure="error"),
         report_refusals,
     ]
     return create_agent(
         model=model,
+        system_prompt=system_prompt(movies, settings.cinema_name, settings.max_seats_per_booking),
         tools=build_tools(store, cinema_timezone, settings.max_seats_per_booking),
         middleware=middleware,
         state_schema=TiketaState,

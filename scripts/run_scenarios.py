@@ -150,8 +150,9 @@ def main() -> None:
     if judge is not None:
         print(f"judge pass {sum(row['verdict'] == 'pass' for row in rows)}/{len(rows)} turns")
     input_tokens = sum((row["usage"] or {}).get("input_tokens", 0) for row in rows)
+    cached_tokens = sum((row["usage"] or {}).get("cached_input_tokens", 0) for row in rows)
     output_tokens = sum((row["usage"] or {}).get("output_tokens", 0) for row in rows)
-    print(f"agent tokens: {input_tokens} in, {output_tokens} out")
+    print(f"agent tokens: {input_tokens} in ({cached_tokens} from the prompt cache), {output_tokens} out")
     RESULTS.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M")
     out = RESULTS / f"{stamp}-{settings.llm_model.replace('/', '_')}.json"

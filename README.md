@@ -29,14 +29,16 @@ the showtime has started, whose conversation it is, and whether the user said ye
 
 | Concern | How |
 |---|---|
-| Free conversation, change of mind, relative dates | One LangChain `create_agent` loop. The prompt is rebuilt per call with the time in WIB, the films and the draft |
+| Free conversation, change of mind, relative dates | One LangChain `create_agent` loop. A fixed system prompt (rules, films), and the time in WIB and the draft as a last message on every call |
+| Cost of long conversations | The fixed text comes first, so DeepSeek reads 80% of input tokens from its prompt cache |
 | No invented ids, prices or seats | Tools validate against Postgres. The draft only changes through `update_booking` |
 | Booking only after a yes | `interrupt()` inside `book_tickets`, resumed by `POST .../confirmation` or a typed reply the reader model classifies |
 | A seat sold once | `UNIQUE (showtime_id, seat_id)`, all seats in one transaction, the tool call id as idempotency key |
 | Other people's data | Conversation id and time come from the server (runtime context). Conversations belong to an API key |
 | Loops and outages | 10 model calls per turn at most, retries for failed and dropped calls, an `error` event otherwise |
 | Long conversations | `SummarizationMiddleware` past 8,000 tokens. The draft is state, so it survives the summary |
-| Restarts, several workers | Conversations are LangGraph checkpoints in Postgres. Redis holds the rate limit and a one-turn-at-a-time lock |
+| Restarts, several workers | Conversations are LangGraph checkpoints in Postgres. Redis holds the rate limit (60 requests a minute per API key, `RATE_LIMIT_PER_MINUTE`) and a one-turn-at-a-time lock |
+| Logs | JSON lines with a request id on every request, next to the traces |
 | Seeing what happened | Every model call, tool call and middleware step traced to a self-hosted Phoenix |
 
 Decisions and the options set aside (DeepSeek Harness, the kit's plain-loop template, HumanInTheLoopMiddleware) are in
@@ -44,8 +46,10 @@ Decisions and the options set aside (DeepSeek Harness, the kit's plain-loop temp
 
 ## Measured
 
-Ten scripted conversations (17 turns) against the running service with real DeepSeek calls, checked in code (events,
-bookings in the database) and by `deepseek-v4-pro` as judge. Details and what each run found: [evals/README.md](evals/README.md).
+Scripted conversations against the running service with real DeepSeek calls, checked in code (events, bookings in
+the database) and by `deepseek-v4-pro` as judge. Details and what each run found: [evals/README.md](evals/README.md).
+The table compares thinking on the first ten conversations (17 turns). With the prompt cache layout, all thirteen
+(25 turns) pass in code and with the judge.
 
 | Thinking | Code checks | Judge | Median turn |
 |---|---|---|---|
