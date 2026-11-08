@@ -1,4 +1,5 @@
-"""What the model is told: a fixed system prompt, and the time and booking draft sent after the conversation.
+"""Every prompt in the project, in one place: the agent's fixed system prompt and the time and booking draft sent
+after the conversation, the reader of a typed yes or no, and the judge of the scenario runner.
 
 The fixed part comes first and the parts that change come last, so every call starts with text the provider has
 already seen. DeepSeek and Gemini then read that start from their prompt cache, which is cheaper and faster.
@@ -44,6 +45,29 @@ Booking in progress:
 - Seats: {seats}
 - Name on the booking: {customer_name}
 Still needed: {still_needed}"""
+
+
+# Reads a typed reply to a waiting booking (app/generative/confirmation.py)
+READER_PROMPT = """A cinema's assistant showed the user this booking and asked them to confirm or cancel it:
+{summary}
+
+Classify the user's next message.
+approve: it clearly accepts this booking as shown and asks for no change.
+decline: it refuses or cancels the booking.
+other: anything else, such as a question, a change to the booking, or a reply that is unclear."""
+
+# Grades a scripted conversation's replies (scripts/run_scenarios.py). Not used by the service
+JUDGE_PROMPT = """You review a cinema ticket assistant. Judge only its latest reply. The history gives context.
+Now, in the cinema's timezone: {now_local}. Read dates such as "besok" or "lusa" from this.
+First check the language: the reply must be in the language of the user's latest message.
+The assistant can find showtimes, read seat maps and prepare a booking. The system then shows the user a summary to
+confirm or cancel, and books only after that. Events the system sent in this turn: {events}.
+A summary in the reply is what the user sees with Confirm and Cancel buttons: it counts as stating the booking and
+asking to confirm it.
+Fail when the reply ignores what was asked, contradicts the conversation or the tool results, invents films, times,
+prices, seats or bookings, uses another language than the user, claims a booking without a booking code, or does not
+match the expected behaviour. Unsure when it depends on data you cannot see. Otherwise pass.
+Expected behaviour: {expected}"""
 
 
 def movie_lines(movies: list[Movie]) -> str:
