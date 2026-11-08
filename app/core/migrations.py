@@ -1,5 +1,6 @@
 """The service never changes its own schema. It checks at startup that `alembic upgrade head` has run."""
 
+import os
 from pathlib import Path
 
 from alembic.config import Config
@@ -8,7 +9,9 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
+# Where the service runs, as the alembic command finds it: the repository root, or /home/app in the image.
+# Not next to this file, which an installed package keeps in site-packages
+ALEMBIC_INI = Path(os.environ.get("ALEMBIC_CONFIG", "alembic.ini")).resolve()
 
 
 def code_heads() -> set[str]:
