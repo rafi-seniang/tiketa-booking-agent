@@ -9,7 +9,7 @@ from app.cinema.seat_layout import ROWS_FRONT_TO_BACK
 from app.cinema.store import CinemaStore
 from app.features.chat.service import ChatService
 
-from conftest import FakeReader, parse_events
+from conftest import OWNER, FakeReader, parse_events
 from fakes import ScriptedChatModel, calls, says
 
 
@@ -89,7 +89,7 @@ async def test_another_caller_cannot_see_or_use_a_conversation(client: httpx.Asy
 
 async def test_a_second_message_while_a_turn_runs_is_a_conflict(client: httpx.AsyncClient, chat: ChatService) -> None:
     session_id = await start(client)
-    await chat.begin_turn(session_id)  # as if a reply were still streaming
+    await chat.begin_turn(session_id, OWNER)  # as if a reply were still streaming
     response = await client.post(f"/v1/sessions/{session_id}/messages", json={"message": "halo"})
     assert response.status_code == 409
 

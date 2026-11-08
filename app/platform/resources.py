@@ -19,6 +19,7 @@ from app.platform.locks import InMemoryKeyLock, KeyLock, RedisKeyLock
 from app.platform.migrations import check_schema
 from app.platform.rate_limit import InMemoryRateLimiter, RateLimiter, RedisRateLimiter
 from app.platform.redis import connect_redis
+from app.platform.token_budget import InMemoryTokenBudget, RedisTokenBudget, TokenBudget
 from app.platform.tracing import start_tracing
 from config.settings import Settings
 
@@ -52,11 +53,21 @@ async def open_resources(settings: Settings) -> AsyncIterator[Resources]:
             stack.push_async_callback(redis.aclose)
         rate_limiter: RateLimiter = RedisRateLimiter(redis) if redis is not None else InMemoryRateLimiter()
         lock: KeyLock = RedisKeyLock(redis) if redis is not None else InMemoryKeyLock()
+        budget: TokenBudget = RedisTokenBudget(redis) if redis is not None else InMemoryTokenBudget()
         model = build_chat_model(settings.llm_model, settings)
         agent = build_agent(model, store, movies, settings, cinema_timezone, checkpointer)
         # A yes or no needs no thinking, and DeepSeek refuses the reader's forced tool call in thinking mode
         reader = ConfirmationReader(build_chat_model(settings.llm_model, settings, reasoning_effort="none"))
-        chat = ChatService(agent, reader, SessionStore(sessions), store, lock, settings.turn_lock_seconds)
+        chat = ChatService(
+            agent,
+            reader,
+            SessionStore(sessions),
+            store,
+            lock,
+            settings.turn_lock_seconds,
+            budget,
+            settings.daily_tokens_per_caller,
+        )
         yield Resources(chat=chat, store=store, rate_limiter=rate_limiter, model_name=settings.llm_model)
 
 

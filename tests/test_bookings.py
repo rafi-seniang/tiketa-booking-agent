@@ -3,7 +3,9 @@ from typing import Any
 import httpx
 
 from app.cinema.schemas import Showtime
+from app.platform.token_budget import InMemoryTokenBudget
 
+from conftest import OWNER, parse_events
 from fakes import ScriptedChatModel, calls, says
 
 
@@ -76,3 +78,18 @@ async def test_the_form_keeps_the_seat_limit_and_needs_a_key(
     assert (await book_on_form(client, form_booking(dune_today[2], nine))).status_code == 409
     missing_key = await client.post("/v1/bookings", json=form_booking(dune_today[2], ["G1"]))
     assert missing_key.status_code == 422
+
+
+async def test_chat_turns_stop_when_the_days_tokens_are_used_up(
+    client: httpx.AsyncClient, model: ScriptedChatModel, budget: InMemoryTokenBudget
+) -> None:
+    model.replies += [says("Halo, ada yang bisa dibantu?")]
+    session_id = (await client.post("/v1/sessions")).json()["session_id"]
+    events = parse_events((await client.post(f"/v1/sessions/{session_id}/messages", json={"message": "halo"})).text)
+    usage = (await client.get("/v1/usage")).json()
+    assert usage["used_tokens"] == events[-1]["data"]["input_tokens"] + events[-1]["data"]["output_tokens"] > 0
+
+    await budget.add(OWNER, usage["daily_tokens"])
+    refused = await client.post(f"/v1/sessions/{session_id}/messages", json={"message": "halo lagi"})
+    assert refused.status_code == 429 and int(refused.headers["Retry-After"]) > 0
+    assert "used up" in refused.json()["detail"]

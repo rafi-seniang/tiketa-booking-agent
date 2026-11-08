@@ -23,6 +23,7 @@ from app.platform.dependencies import get_now, get_resources
 from app.platform.locks import InMemoryKeyLock
 from app.platform.rate_limit import InMemoryRateLimiter
 from app.platform.resources import Resources
+from app.platform.token_budget import InMemoryTokenBudget
 from config.settings import Settings
 
 from fakes import ScriptedChatModel
@@ -98,10 +99,20 @@ def reader() -> FakeReader:
 
 
 @pytest.fixture
+def budget() -> InMemoryTokenBudget:
+    return InMemoryTokenBudget()
+
+
+@pytest.fixture
 def chat(
-    agent: CompiledStateGraph[Any, Any, Any, Any], reader: FakeReader, sessions: Sessions, store: CinemaStore
+    agent: CompiledStateGraph[Any, Any, Any, Any],
+    reader: FakeReader,
+    sessions: Sessions,
+    store: CinemaStore,
+    budget: InMemoryTokenBudget,
 ) -> ChatService:
-    return ChatService(agent, reader, SessionStore(sessions), store, InMemoryKeyLock(), 60)  # type: ignore[arg-type]
+    reader_any: Any = reader  # FakeReader has the reader's one method
+    return ChatService(agent, reader_any, SessionStore(sessions), store, InMemoryKeyLock(), 60, budget, 10_000)
 
 
 @pytest.fixture
