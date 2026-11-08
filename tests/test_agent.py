@@ -82,7 +82,7 @@ async def test_a_typed_reply_to_the_confirmation_joins_the_conversation(
     model.replies += [calls(choose(dune_today[2], ["A1"])), calls(("book_tickets", {})), says("Mau ganti ke mana?")]
     await ask(agent, "dune jam 6, A1, Rafi")
     await agent.ainvoke(Command(resume={"approved": False, "user_message": "ganti D5 aja"}), CONFIG, context=CONTEXT)
-    tool_result, typed_reply = model.received[-1][-2:]
+    tool_result, typed_reply = model.received[-1][-3:-1]  # the turn context comes last
     assert isinstance(tool_result, ToolMessage) and "instead of confirming" in tool_result.text
     assert isinstance(typed_reply, HumanMessage) and typed_reply.text == "ganti D5 aja"
 
@@ -138,16 +138,28 @@ async def test_a_seat_sold_while_the_user_decides_is_not_booked_twice(
     assert "Already taken: D9" in (await tool_messages(agent))[-1].text
 
 
-async def test_the_prompt_holds_the_local_time_and_the_booking_so_far(
+async def test_the_last_message_holds_the_local_time_and_the_booking_so_far(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
     model.replies += [calls(choose(dune_today[2], ["D9"], name=None)), says("Atas nama siapa?")]
     await ask(agent, "dune jam 6, D9")
-    first_prompt, second_prompt = (calls_seen[0] for calls_seen in model.received)
-    assert isinstance(first_prompt, SystemMessage) and isinstance(second_prompt, SystemMessage)
-    assert "Now: Sunday 08 November 2026, 10:00 WIB" in first_prompt.text
-    assert "Still needed: showtime, seats, name on the booking" in first_prompt.text
-    assert "- Seats: D9" in second_prompt.text and "Still needed: name on the booking" in second_prompt.text
+    first_context, second_context = (calls_seen[-1] for calls_seen in model.received)
+    assert isinstance(first_context, SystemMessage) and isinstance(second_context, SystemMessage)
+    assert "Now: Sunday 08 November 2026, 10:00 WIB" in first_context.text
+    assert "Still needed: showtime, seats, name on the booking" in first_context.text
+    assert "- Seats: D9" in second_context.text and "Still needed: name on the booking" in second_context.text
+
+
+async def test_every_call_starts_with_the_same_text_so_the_provider_can_cache_it(
+    agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
+) -> None:
+    model.replies += [calls(choose(dune_today[2], ["D9"], name=None)), says("Atas nama siapa?")]
+    await ask(agent, "dune jam 6, D9")
+    first_call, second_call = model.received
+    assert second_call[: len(first_call) - 1] == first_call[:-1]  # only the context at the end differs
+    assert all(not isinstance(message, SystemMessage) or "Now:" not in message.text for message in second_call[:-1])
+    state = await agent.aget_state(CONFIG)
+    assert not any(isinstance(message, SystemMessage) for message in state.values["messages"])
 
 
 async def test_a_turn_that_keeps_calling_tools_is_stopped(
