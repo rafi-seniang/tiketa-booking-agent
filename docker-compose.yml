@@ -1,0 +1,47 @@
+# What the service needs locally: Postgres (cinema data and conversation checkpoints), Redis (rate limit and turn
+# lock) and Phoenix (traces). The service runs on the host: `docker compose up -d`, `python scripts/seed.py`,
+# then `python main.py`. Ports sit next to the other Lab backends' (Redis 6379 to 6382 are taken) and listen
+# on 127.0.0.1 only.
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    container_name: tiketa-postgres
+    environment:
+      POSTGRES_USER: tiketa
+      POSTGRES_PASSWORD: tiketa-local
+      POSTGRES_DB: tiketa
+    ports: ["127.0.0.1:5433:5432"]
+    volumes: ["tiketa-postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiketa -d tiketa"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: tiketa-redis
+    ports: ["127.0.0.1:6383:6379"]
+    # Locks and rate counters all expire, so only keys with a timeout may be evicted
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "volatile-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  phoenix:
+    image: arizephoenix/phoenix:version-21.0.0-nonroot
+    container_name: tiketa-phoenix
+    ports: ["127.0.0.1:6006:6006"]
+    # Traces are kept in the same Postgres, in their own schema, so they survive a restart without a volume
+    environment:
+      PHOENIX_SQL_DATABASE_URL: postgresql://tiketa:tiketa-local@postgres:5432/tiketa
+      PHOENIX_SQL_DATABASE_SCHEMA: phoenix
+      # Phoenix asks for a login when it listens beyond loopback, as it does in a container. The port is
+      # published on 127.0.0.1 only, so local traces need none. Turn it on before exposing Phoenix anywhere
+      PHOENIX_ENABLE_AUTH: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  tiketa-postgres:
