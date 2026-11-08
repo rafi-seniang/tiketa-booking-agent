@@ -29,6 +29,7 @@ from fakes import ScriptedChatModel
 
 CINEMA_TIMEZONE = ZoneInfo("Asia/Jakarta")
 NOW = datetime(2026, 11, 8, 3, 0, tzinfo=UTC)  # Sunday 10:00 in Jakarta
+OWNER = "key:key-0001"  # how caller_of names the test client's API key, test-key-0001
 DUNE = 9  # the film id of Dune: Part Two in the seed, shown at 12:30, 15:15, 18:00 and 20:45
 
 

@@ -33,11 +33,11 @@ class ChatController:
     async def send_message(self, session_id: str, body: MessageIn, owner: str, now: datetime) -> StreamingResponse:
         await self._service.check_owner(session_id, owner)  # 404 and 409 go out before the stream starts
         await self._service.begin_turn(session_id)
-        return event_stream(self._service.message_turn(session_id, body.message, now))
+        return event_stream(self._service.message_turn(session_id, owner, body.message, now))
 
     async def answer_confirmation(
         self, session_id: str, body: ConfirmationIn, owner: str, now: datetime
     ) -> StreamingResponse:
         await self._service.check_owner(session_id, owner)
         await self._service.begin_turn(session_id, answers_confirmation=True)
-        return event_stream(self._service.confirmation_turn(session_id, body.approved, now))
+        return event_stream(self._service.confirmation_turn(session_id, owner, body.approved, now))

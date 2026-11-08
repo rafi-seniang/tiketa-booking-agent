@@ -2,7 +2,7 @@
 
 import secrets
 from datetime import date, datetime
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, func, select
@@ -10,7 +10,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cinema.clock import local_day_window
-from app.cinema.schemas import Booking, BookingRequest, Movie, SeatMap, SeatRowView, SeatView, Showtime
+from app.cinema.schemas import (
+    Booking,
+    BookingRequest,
+    Channel,
+    Movie,
+    SeatMap,
+    SeatRowView,
+    SeatView,
+    Showtime,
+)
 from app.cinema.seat_layout import SEATS_PER_SHOWTIME, seat_rows
 from app.cinema.tables import BookedSeatRow, BookingRow, MovieRow, ShowtimeRow
 from app.platform.database import Sessions
@@ -115,6 +124,8 @@ class CinemaStore:
                 booking = BookingRow(
                     code=new_booking_code(),
                     idempotency_key=request.idempotency_key,
+                    owner=request.owner,
+                    channel=request.channel,
                     session_id=request.session_id,
                     showtime_id=request.showtime_id,
                     customer_name=request.customer_name,
@@ -146,6 +157,17 @@ class CinemaStore:
             )  # in the order they were made
             return [await self._booking_of(db, row) for row in rows]  # a conversation has a handful of bookings
 
+    async def bookings_for_owner(self, owner: str, limit: int) -> list[Booking]:
+        """The caller's latest bookings, from the chat and the form, newest first."""
+        async with self._sessions() as db:
+            rows = await db.scalars(
+                select(BookingRow)
+                .where(BookingRow.owner == owner)
+                .order_by(BookingRow.created_at.desc(), BookingRow.id.desc())
+                .limit(limit)
+            )
+            return [await self._booking_of(db, row) for row in rows]
+
     async def _booking_with_key(self, idempotency_key: str) -> Booking | None:
         async with self._sessions() as db:
             row = await db.scalar(select(BookingRow).where(BookingRow.idempotency_key == idempotency_key))
@@ -158,6 +180,7 @@ class CinemaStore:
         )  # in the order the customer chose them
         return Booking(
             code=row.code,
+            channel=cast(Channel, row.channel),
             showtime=showtime,
             seats=list(seat_ids),
             customer_name=row.customer_name,

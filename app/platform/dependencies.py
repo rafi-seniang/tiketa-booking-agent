@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
+from app.cinema.store import CinemaStore
 from app.platform.errors import RateLimited
 from app.platform.rate_limit import RateLimiter, caller_of
 from app.platform.resources import Resources
@@ -39,3 +40,8 @@ async def enforce_rate_limit(
     retry_after = await rate_limiter.hit(caller_of(request), settings.rate_limit_per_minute)
     if retry_after is not None:
         raise RateLimited(f"Over {settings.rate_limit_per_minute} requests a minute.", retry_after)
+
+
+def get_store(resources: Annotated[Resources, Depends(get_resources)]) -> CinemaStore:
+    """The cinema's data, shared by the catalog and the booking form."""
+    return resources.store

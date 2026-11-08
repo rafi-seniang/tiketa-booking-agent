@@ -1,7 +1,7 @@
 """What the cinema hands out and takes in. Seat ids are checked here, once, where they enter."""
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field
 
@@ -48,8 +48,12 @@ class Showtime(BaseModel):
     seats_left: int
 
 
+Channel = Literal["chat", "web"]
+
+
 class Booking(BaseModel):
     code: str
+    channel: Channel
     showtime: Showtime
     seats: list[str]
     customer_name: str
@@ -59,7 +63,9 @@ class Booking(BaseModel):
 
 class BookingRequest(BaseModel):
     idempotency_key: str
-    session_id: str
+    owner: str
+    channel: Channel
+    session_id: str | None = None
     showtime_id: int
     seats: SeatIds
     customer_name: CustomerName

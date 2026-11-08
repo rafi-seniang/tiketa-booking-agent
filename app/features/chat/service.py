@@ -129,7 +129,7 @@ class ChatService:
             await self._lock.release(f"turn:{session_id}")
             raise Conflict("No booking is waiting for confirmation")
 
-    async def message_turn(self, session_id: str, text: str, now: datetime) -> AsyncIterator[ChatEvent]:
+    async def message_turn(self, session_id: str, owner: str, text: str, now: datetime) -> AsyncIterator[ChatEvent]:
         """The caller has begun the turn. It ends here, whatever happens."""
         try:
             try:
@@ -139,7 +139,7 @@ class ChatService:
                 yield ChatEvent(type="error", text=FAILED_TURN_TEXT)
                 yield ChatEvent(type="end", data=TurnUsage().as_data())
                 return
-            async for event in self._run(graph_input, session_id, now):
+            async for event in self._run(graph_input, session_id, owner, now):
                 yield event
         finally:
             await self._lock.release(f"turn:{session_id}")
@@ -153,21 +153,23 @@ class ChatService:
         await self._close_unfinished_tool_calls(session_id)
         return {"messages": [HumanMessage(text)]}
 
-    async def confirmation_turn(self, session_id: str, approved: bool, now: datetime) -> AsyncIterator[ChatEvent]:
+    async def confirmation_turn(
+        self, session_id: str, owner: str, approved: bool, now: datetime
+    ) -> AsyncIterator[ChatEvent]:
         """A Confirm or Cancel button press. The caller has begun the turn. It ends here, whatever happens."""
         try:
-            async for event in self._run(Command(resume={"approved": approved}), session_id, now):
+            async for event in self._run(Command(resume={"approved": approved}), session_id, owner, now):
                 yield event
         finally:
             await self._lock.release(f"turn:{session_id}")
 
-    async def _run(self, graph_input: Any, session_id: str, now: datetime) -> AsyncIterator[ChatEvent]:
+    async def _run(self, graph_input: Any, session_id: str, owner: str, now: datetime) -> AsyncIterator[ChatEvent]:
         usage = TurnUsage()
         try:
             async for part in self._agent.astream(
                 graph_input,
                 config_of(session_id),
-                context=ChatContext(session_id=session_id, now=now),
+                context=ChatContext(session_id=session_id, owner=owner, now=now),
                 stream_mode=STREAM_MODES,
                 version="v2",
             ):
