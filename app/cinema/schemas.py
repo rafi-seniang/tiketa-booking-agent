@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field
 
-from app.cinema.seat_layout import ALL_SEAT_IDS
+from app.cinema.seat_layout import AISLE_AFTER_SEAT, ALL_SEAT_IDS, WALKWAY_BEFORE_ROW
 
 
 def known_seat_id(seat_id: str) -> str:
@@ -82,7 +82,9 @@ class SeatRowView(BaseModel):
 
 
 class SeatMap(BaseModel):
-    """For a UI: rows front to back. The aisle sits after seat 9 and a walkway before row L."""
+    """For a UI: rows front to back, and where the aisle and the walkway fall, so a UI draws the real room."""
 
     showtime: Showtime
     rows: list[SeatRowView]
+    aisle_after_seat: int = AISLE_AFTER_SEAT
+    walkway_before_row: str = WALKWAY_BEFORE_ROW

@@ -23,6 +23,7 @@ class SessionCreated(BaseModel):
 class BookingSummary(BaseModel):
     """Built in code from the database and shown to the user before anything is booked."""
 
+    showtime_id: int | None = None  # None only in summaries saved before the field existed
     movie_title: str
     starts_at: datetime
     starts_at_local: str

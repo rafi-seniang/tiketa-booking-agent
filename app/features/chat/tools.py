@@ -149,6 +149,7 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
         refuse_started_showtime(showtime, now)
         await refuse_taken_seats(showtime_id, seat_ids)
         summary = BookingSummary(
+            showtime_id=showtime.id,
             movie_title=showtime.movie_title,
             starts_at=showtime.starts_at,
             starts_at_local=local_text(showtime.starts_at, cinema_timezone),
