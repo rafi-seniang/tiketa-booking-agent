@@ -7,11 +7,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from app.core.dependencies import get_now
-from app.features.chat.controller import ChatController
-from app.features.chat.dependencies import get_chat_controller
-from app.features.chat.schemas import ConfirmationIn, MessageIn, SessionCreated, SessionView, TokenUsageView
+from app.controllers.chat import ChatController
+from app.core.dependencies import get_chat_controller, get_now
 from app.middleware.rate_limit import caller_of
+from app.schemas.chat import ConfirmationIn, MessageIn, SessionCreated, SessionView, TokenUsageView
 
 router = APIRouter(prefix="/sessions", tags=["chat"])
 usage_router = APIRouter(tags=["chat"])

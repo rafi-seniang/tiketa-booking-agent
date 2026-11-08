@@ -15,12 +15,12 @@ from app.core.redis import connect_redis
 from app.core.token_budget import InMemoryTokenBudget, RedisTokenBudget, TokenBudget
 from app.core.tracing import start_tracing
 from app.engines.llm import build_chat_model
-from app.features.chat.agent import build_agent
-from app.features.chat.confirmation import ConfirmationReader
-from app.features.chat.service import ChatService
-from app.features.chat.session_store import SessionStore
+from app.generative.confirmation import ConfirmationReader
 from app.middleware.rate_limit import InMemoryRateLimiter, RateLimiter, RedisRateLimiter
+from app.repositories.chat_sessions import SessionStore
 from app.repositories.cinema import CinemaStore
+from app.services.booking_agent import build_agent
+from app.services.chat import ChatService
 from app.settings import Settings
 
 

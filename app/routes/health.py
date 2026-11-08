@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from app import VERSION
 from app.core.dependencies import get_resources
 from app.core.lifespan import Resources
-from app.features.health.schemas import ServiceMeta
+from app.schemas.health import ServiceMeta
 
 router = APIRouter(tags=["health"])
 

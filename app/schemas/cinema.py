@@ -88,3 +88,11 @@ class SeatMap(BaseModel):
     rows: list[SeatRowView]
     aisle_after_seat: int = AISLE_AFTER_SEAT
     walkway_before_row: str = WALKWAY_BEFORE_ROW
+
+
+class BookingForm(BaseModel):
+    """What the booking form sends. The owner and channel come from the server."""
+
+    showtime_id: int
+    seats: SeatIds
+    customer_name: CustomerName

@@ -7,13 +7,10 @@ from app.core.dependencies import enforce_rate_limit
 from app.core.errors import register_error_handlers
 from app.core.lifespan import lifespan
 from app.core.logging import configure_logging
-from app.features.bookings import router as bookings
-from app.features.catalog import router as catalog
-from app.features.chat import router as chat
-from app.features.health import router as health
 from app.middleware.auth import require_api_key
 from app.middleware.cors import add_cors
 from app.middleware.request_log import register_middleware
+from app.routes import bookings, catalog, chat, health
 from app.settings import Settings, get_settings
 
 

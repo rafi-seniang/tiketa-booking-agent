@@ -4,9 +4,9 @@ import httpx
 import pytest
 from langchain_core.messages import ToolMessage
 
-from app.features.chat.service import ChatService
 from app.repositories.cinema import CinemaStore
 from app.schemas.cinema import Showtime
+from app.services.chat import ChatService
 from app.utils.seat_layout import ROWS_FRONT_TO_BACK
 
 from conftest import OWNER, FakeReader, parse_events

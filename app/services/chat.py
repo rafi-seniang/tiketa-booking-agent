@@ -15,11 +15,11 @@ from langgraph.types import Command, StateSnapshot, StreamMode, StreamPart
 from app.core.errors import Conflict, RateLimited
 from app.core.locks import KeyLock
 from app.core.token_budget import TokenBudget, seconds_to_reset
-from app.features.chat.confirmation import ConfirmationReader
-from app.features.chat.schemas import BookingSummary, ChatEvent, SessionView, TokenUsageView, Turn
-from app.features.chat.session_store import SessionStore
-from app.features.chat.state import ChatContext
+from app.generative.confirmation import ConfirmationReader
+from app.repositories.chat_sessions import SessionStore
 from app.repositories.cinema import CinemaStore
+from app.schemas.agent import ChatContext
+from app.schemas.chat import BookingSummary, ChatEvent, SessionView, TokenUsageView, Turn
 
 logger = logging.getLogger(__name__)
 

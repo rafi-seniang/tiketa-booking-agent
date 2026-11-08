@@ -16,14 +16,14 @@ from app.core.dependencies import get_now, get_resources
 from app.core.lifespan import Resources
 from app.core.locks import InMemoryKeyLock
 from app.core.token_budget import InMemoryTokenBudget
-from app.features.chat.agent import build_agent
-from app.features.chat.schemas import BookingSummary
-from app.features.chat.service import ChatService
-from app.features.chat.session_store import SessionStore
 from app.middleware.rate_limit import InMemoryRateLimiter
+from app.repositories.chat_sessions import SessionStore
 from app.repositories.cinema import CinemaStore
 from app.repositories.seed import seed
+from app.schemas.chat import BookingSummary
 from app.schemas.cinema import Showtime
+from app.services.booking_agent import build_agent
+from app.services.chat import ChatService
 from app.settings import Settings
 
 from fakes import ScriptedChatModel

@@ -5,7 +5,7 @@ from datetime import datetime
 
 from fastapi.responses import StreamingResponse
 
-from app.features.chat.schemas import (
+from app.schemas.chat import (
     ChatEvent,
     ConfirmationIn,
     MessageIn,
@@ -13,7 +13,7 @@ from app.features.chat.schemas import (
     SessionView,
     TokenUsageView,
 )
-from app.features.chat.service import ChatService
+from app.services.chat import ChatService
 
 
 def event_stream(events: AsyncIterator[ChatEvent]) -> StreamingResponse:

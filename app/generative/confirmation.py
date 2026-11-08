@@ -6,7 +6,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
-from app.features.chat.schemas import BookingSummary
+from app.schemas.chat import BookingSummary
 
 READER_PROMPT = """A cinema's assistant showed the user this booking and asked them to confirm or cancel it:
 {summary}

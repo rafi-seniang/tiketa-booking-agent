@@ -7,7 +7,7 @@ already seen. DeepSeek and Gemini then read that start from their prompt cache, 
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from app.features.chat.state import Draft, missing_fields
+from app.schemas.agent import Draft, missing_fields
 from app.schemas.cinema import Movie
 from app.utils.clock import local_text
 

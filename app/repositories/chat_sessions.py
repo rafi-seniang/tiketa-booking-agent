@@ -3,19 +3,9 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.core.database import Base, Sessions, UtcDateTime
+from app.core.database import Sessions
 from app.core.errors import NotFound
-
-
-class ChatSessionRow(Base):
-    __tablename__ = "chat_sessions"
-
-    id: Mapped[str] = mapped_column(String(40), primary_key=True)
-    owner: Mapped[str] = mapped_column(String(80))
-    created_at: Mapped[datetime] = mapped_column(UtcDateTime)
+from app.models.chat import ChatSessionRow
 
 
 class SessionStore:
