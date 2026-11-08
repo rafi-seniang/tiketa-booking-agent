@@ -55,8 +55,6 @@ def key_id(api_key: str) -> str:
 
 
 def caller_of(request: Request) -> str:
-    """The API key when one is sent, otherwise the client address."""
-    api_key = request.headers.get("X-API-Key")
-    if api_key:
-        return key_id(api_key)
-    return f"ip:{request.client.host if request.client else 'unknown'}"
+    """The caller authentication named, otherwise (on /auth, before anyone is known) the client address."""
+    caller: str | None = getattr(request.state, "caller", None)
+    return caller or f"ip:{request.client.host if request.client else 'unknown'}"

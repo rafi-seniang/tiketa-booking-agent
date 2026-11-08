@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +20,9 @@ class Settings(BaseSettings):
 
     # Comma-separated keys accepted in the X-API-Key header. Empty disables auth (local only).
     api_keys: SecretStr = SecretStr("")
+    # Signs guest session cookies (HMAC-SHA256). Required in production; empty means a random one per process
+    session_secret: SecretStr = SecretStr("")
+    guest_session_days: int = Field(default=7, gt=0)
     # Browser origins allowed to call the API (the lab frontend in development and preview)
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
 
@@ -66,6 +69,14 @@ class Settings(BaseSettings):
     # Phoenix's OTLP endpoint, for example http://localhost:6006/v1/traces. Empty turns tracing off
     phoenix_collector_endpoint: str = ""
     phoenix_project_name: str = "tiketa"
+
+    @model_validator(mode="after")
+    def production_needs_secrets(self) -> "Settings":
+        if self.environment == "production" and not (
+            self.api_keys.get_secret_value() and self.session_secret.get_secret_value()
+        ):
+            raise ValueError("production needs API_KEYS and SESSION_SECRET")
+        return self
 
     @property
     def api_key_list(self) -> list[str]:
