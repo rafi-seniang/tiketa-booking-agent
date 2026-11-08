@@ -3,6 +3,7 @@
 A fixed one-minute window: one INCR and one EXPIRE per request, in a single round trip.
 """
 
+import hashlib
 import time
 from typing import Protocol
 
@@ -48,9 +49,12 @@ class InMemoryRateLimiter:
         return None if self._counts[key] <= limit else seconds_left
 
 
+def key_id(api_key: str) -> str:
+    """A caller's name from its API key: stable, and nothing of the key itself reaches Redis, logs or the database."""
+    return f"key:{hashlib.sha256(api_key.encode()).hexdigest()[:16]}"
+
+
 def caller_of(request: Request) -> str:
-    """The API key when one is sent, otherwise the client address."""
-    api_key = request.headers.get("X-API-Key")
-    if api_key:
-        return f"key:{api_key[-8:]}"  # the key's end tells callers apart and keeps the full key out of Redis
-    return f"ip:{request.client.host if request.client else 'unknown'}"
+    """The caller authentication named, otherwise (on /auth, before anyone is known) the client address."""
+    caller: str | None = getattr(request.state, "caller", None)
+    return caller or f"ip:{request.client.host if request.client else 'unknown'}"

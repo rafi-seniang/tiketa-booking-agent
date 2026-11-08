@@ -16,7 +16,7 @@ from app.core.dependencies import get_now, get_resources
 from app.core.lifespan import Resources
 from app.core.locks import InMemoryKeyLock
 from app.core.token_budget import InMemoryTokenBudget
-from app.middleware.rate_limit import InMemoryRateLimiter
+from app.middleware.rate_limit import InMemoryRateLimiter, key_id
 from app.repositories.chat_sessions import SessionStore
 from app.repositories.cinema import CinemaStore
 from app.repositories.seed import seed
@@ -30,7 +30,7 @@ from fakes import ScriptedChatModel
 
 CINEMA_TIMEZONE = ZoneInfo("Asia/Jakarta")
 NOW = datetime(2026, 11, 8, 3, 0, tzinfo=UTC)  # Sunday 10:00 in Jakarta
-OWNER = "key:key-0001"  # how caller_of names the test client's API key, test-key-0001
+OWNER = key_id("test-key-0001")  # the caller the test client's API key stands for
 DUNE = 9  # the film id of Dune: Part Two in the seed, shown at 12:30, 15:15, 18:00 and 20:45
 
 
@@ -112,7 +112,7 @@ def chat(
     budget: InMemoryTokenBudget,
 ) -> ChatService:
     reader_any: Any = reader  # FakeReader has the reader's one method
-    return ChatService(agent, reader_any, SessionStore(sessions), store, InMemoryKeyLock(), 60, budget, 10_000)
+    return ChatService(agent, reader_any, SessionStore(sessions), store, InMemoryKeyLock(), 60, budget, 10_000, 50_000)
 
 
 @pytest.fixture

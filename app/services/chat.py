@@ -14,7 +14,7 @@ from langgraph.types import Command, StateSnapshot, StreamMode, StreamPart
 
 from app.core.errors import Conflict, RateLimited
 from app.core.locks import KeyLock
-from app.core.token_budget import TokenBudget, seconds_to_reset
+from app.core.token_budget import EVERYONE, TokenBudget, seconds_to_reset
 from app.generative.confirmation import ConfirmationReader
 from app.repositories.chat_sessions import SessionStore
 from app.repositories.cinema import CinemaStore
@@ -102,6 +102,7 @@ class ChatService:
         turn_lock_seconds: int,
         budget: TokenBudget,
         daily_tokens: int,
+        daily_tokens_total: int,
     ) -> None:
         self._agent = agent
         self._reader = reader
@@ -111,6 +112,7 @@ class ChatService:
         self._turn_lock_seconds = turn_lock_seconds
         self._budget = budget
         self._daily_tokens = daily_tokens
+        self._daily_tokens_total = daily_tokens_total
 
     async def start_session(self, owner: str, now: datetime) -> str:
         return await self._sessions.create(owner, now)
@@ -139,7 +141,12 @@ class ChatService:
         )
 
     async def begin_turn(self, session_id: str, owner: str, answers_confirmation: bool = False) -> None:
-        """One turn at a time per conversation, within the caller's tokens for the day."""
+        """One turn at a time per conversation, within the day's tokens for everyone and for the caller."""
+        if await self._budget.used(EVERYONE) >= self._daily_tokens_total:
+            reset = seconds_to_reset(time.time())
+            raise RateLimited(
+                "The chat is closed for today: its model budget is used up. The booking form still works", reset
+            )
         if await self._budget.used(owner) >= self._daily_tokens:
             reset = seconds_to_reset(time.time())
             raise RateLimited(f"The {self._daily_tokens:,} model tokens for today are used up", reset)

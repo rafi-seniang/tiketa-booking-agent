@@ -67,6 +67,7 @@ async def open_resources(settings: Settings) -> AsyncIterator[Resources]:
             settings.turn_lock_seconds,
             budget,
             settings.daily_tokens_per_caller,
+            settings.daily_tokens_total,
         )
         yield Resources(chat=chat, store=store, rate_limiter=rate_limiter, model_name=settings.llm_model)
 

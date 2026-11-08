@@ -35,10 +35,11 @@ the showtime has started, whose conversation it is, and whether the user said ye
 | Booking only after a yes | `interrupt()` inside `book_tickets`, resumed by `POST .../confirmation` or a typed reply the reader model classifies |
 | A seat sold once | `UNIQUE (showtime_id, seat_id)`, all seats in one transaction, the tool call id as idempotency key |
 | Other people's data | Conversation id and time come from the server (runtime context). Conversations belong to an API key |
+| Keys in the browser | None: browsers get a signed HttpOnly guest session cookie from `POST /auth/guest`. Threat model in [SECURITY.md](SECURITY.md) |
 | Loops and outages | 10 model calls per turn at most, retries for failed and dropped calls, an `error` event otherwise |
 | Long conversations | `SummarizationMiddleware` past 8,000 tokens. The draft is state, so it survives the summary |
 | Restarts, several workers | Conversations are LangGraph checkpoints in Postgres. Redis holds the rate limit (60 requests a minute per API key, `RATE_LIMIT_PER_MINUTE`) and a one-turn-at-a-time lock |
-| Cost per caller | 400,000 model tokens a day per API key on chat turns (`DAILY_TOKENS_PER_CALLER`), counted in Redis. Over it, a turn gets 429 with `Retry-After`. The booking form spends none |
+| Cost | 400,000 model tokens a day per caller and 3,000,000 for everyone together (`DAILY_TOKENS_PER_CALLER`, `DAILY_TOKENS_TOTAL`), counted in Redis. Over either, a turn gets 429 with `Retry-After`. The booking form spends none |
 | Schema changes | Alembic migrations in `migrations/`. The service checks the revision at startup and never changes its own schema |
 | Logs | JSON lines with a request id on every request, next to the traces |
 | Seeing what happened | Every model call, tool call and middleware step traced to a self-hosted Phoenix |
@@ -94,11 +95,12 @@ Switch to Gemini with `LLM_MODEL=gemini/gemini-3.8-flash` (reads `GEMINI_API_KEY
 | `POST /v1/bookings` | Book from a form: `showtime_id`, `seats`, `customer_name`, and an `Idempotency-Key` header. No model is called |
 | `GET /v1/bookings` | The caller's latest bookings from the chat and the form, newest first, each with its `channel` |
 | `GET /v1/usage` | The caller's chat tokens today against the daily budget |
+| `POST /auth/guest` | Sets a guest session cookie, for browsers, which never get an API key |
 | `GET /health`, `GET /meta` | The Lab backend contract |
 
 Events, one JSON object per `data:` line: `token` (a piece of the reply), `tool` (the agent calls a tool), `confirmation`
 (the summary to show with Confirm and Cancel), `booking` (the booking just made), `message` (the whole reply, the one to
-keep), `error`, `end` (model calls and tokens of the turn). `/v1` needs `X-API-Key` when `API_KEYS` is set.
+keep), `error`, `end` (model calls and tokens of the turn). `/v1` needs `X-API-Key` or a guest session cookie when `API_KEYS` is set.
 
 ## Layout
 

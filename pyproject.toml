@@ -29,6 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=9",
+    "pip-audit==2.10.1",
     "pytest-asyncio>=1.0",
     "ruff>=0.15",
     "mypy>=2.0",

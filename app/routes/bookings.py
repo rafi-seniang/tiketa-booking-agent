@@ -7,12 +7,12 @@ from fastapi import APIRouter, Depends, Header
 
 from app.controllers.bookings import BookingController
 from app.core.dependencies import get_booking_controller, get_now
-from app.middleware.rate_limit import caller_of
+from app.middleware.auth import authenticate
 from app.schemas.cinema import Booking, BookingForm
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 Controller = Annotated[BookingController, Depends(get_booking_controller)]
-Caller = Annotated[str, Depends(caller_of)]
+Caller = Annotated[str, Depends(authenticate)]
 
 
 @router.post("", status_code=201)

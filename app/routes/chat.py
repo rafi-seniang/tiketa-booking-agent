@@ -9,13 +9,13 @@ from fastapi.responses import StreamingResponse
 
 from app.controllers.chat import ChatController
 from app.core.dependencies import get_chat_controller, get_now
-from app.middleware.rate_limit import caller_of
+from app.middleware.auth import authenticate
 from app.schemas.chat import ConfirmationIn, MessageIn, SessionCreated, SessionView, TokenUsageView
 
 router = APIRouter(prefix="/sessions", tags=["chat"])
 usage_router = APIRouter(tags=["chat"])
 Controller = Annotated[ChatController, Depends(get_chat_controller)]
-Caller = Annotated[str, Depends(caller_of)]
+Caller = Annotated[str, Depends(authenticate)]
 Now = Annotated[datetime, Depends(get_now)]
 EVENT_STREAM: dict[int | str, dict[str, Any]] = {
     200: {"content": {"text/event-stream": {}}, "description": "ChatEvent objects, one per data: line"}
