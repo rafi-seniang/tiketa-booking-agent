@@ -14,8 +14,9 @@ from app.features.chat.confirmation import ConfirmationReader
 from app.features.chat.service import ChatService
 from app.features.chat.session_store import SessionStore
 from app.platform.checkpoints import open_checkpointer
-from app.platform.database import connect_database, create_tables
+from app.platform.database import connect_database
 from app.platform.locks import InMemoryKeyLock, KeyLock, RedisKeyLock
+from app.platform.migrations import check_schema
 from app.platform.rate_limit import InMemoryRateLimiter, RateLimiter, RedisRateLimiter
 from app.platform.redis import connect_redis
 from app.platform.tracing import start_tracing
@@ -39,7 +40,7 @@ async def open_resources(settings: Settings) -> AsyncIterator[Resources]:
         database_url = settings.database_url.get_secret_value()
         engine, sessions = connect_database(database_url)
         stack.push_async_callback(engine.dispose)
-        await create_tables(engine)
+        await check_schema(engine)  # migrations run before the service, not inside it
         cinema_timezone = ZoneInfo(settings.cinema_timezone)
         store = CinemaStore(sessions, cinema_timezone)
         movies = await store.list_movies()

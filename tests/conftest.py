@@ -18,7 +18,7 @@ from app.features.chat.agent import build_agent
 from app.features.chat.schemas import BookingSummary
 from app.features.chat.service import ChatService
 from app.features.chat.session_store import SessionStore
-from app.platform.database import Sessions, connect_database, create_tables
+from app.platform.database import Base, Sessions, connect_database
 from app.platform.dependencies import get_now, get_resources
 from app.platform.locks import InMemoryKeyLock
 from app.platform.rate_limit import InMemoryRateLimiter
@@ -62,7 +62,8 @@ def settings(tmp_path: Path) -> Settings:
 @pytest.fixture
 async def sessions(settings: Settings) -> AsyncIterator[Sessions]:
     engine, session_factory = connect_database(settings.database_url.get_secret_value())
-    await create_tables(engine)
+    async with engine.begin() as connection:  # migrations are tested on their own in test_migrations.py
+        await connection.run_sync(Base.metadata.create_all)
     await seed(session_factory, NOW.astimezone(CINEMA_TIMEZONE).date(), 2, CINEMA_TIMEZONE)
     yield session_factory
     await engine.dispose()

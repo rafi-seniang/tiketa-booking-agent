@@ -1,6 +1,6 @@
 """Add the sample films and a schedule from today (cinema time) for --days days. Safe to run again.
 
-Usage: python scripts/seed.py [--days 7]
+Usage: alembic upgrade head && python scripts/seed.py [--days 7]
 """
 
 import argparse
@@ -9,7 +9,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.cinema.seed import seed
-from app.platform.database import connect_database, create_tables
+from app.platform.database import connect_database
+from app.platform.migrations import check_schema
 from config.settings import get_settings
 
 
@@ -20,7 +21,7 @@ async def main() -> None:
     settings = get_settings()
     cinema_timezone = ZoneInfo(settings.cinema_timezone)
     engine, sessions = connect_database(settings.database_url.get_secret_value())
-    await create_tables(engine)
+    await check_schema(engine)
     today = datetime.now(cinema_timezone).date()
     new_movies, new_showtimes = await seed(sessions, today, args.days, cinema_timezone)
     await engine.dispose()
