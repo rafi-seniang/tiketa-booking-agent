@@ -17,3 +17,8 @@ async def test_a_caller_over_the_limit_gets_429_with_retry_after(
     statuses = [(await client.get("/v1/movies")).status_code for _ in range(3)]
     assert statuses == [200, 200, 429]
     assert (await client.get("/v1/movies")).headers["Retry-After"] == "40"
+
+
+def test_a_caller_is_named_by_a_hash_of_its_key_not_by_any_part_of_it() -> None:
+    name = rate_limit.key_id("live-key-7f3a9c2e")
+    assert name.startswith("key:") and "7f3a9c2e" not in name and name == rate_limit.key_id("live-key-7f3a9c2e")
