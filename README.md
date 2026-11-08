@@ -102,14 +102,21 @@ keep), `error`, `end` (model calls and tokens of the turn). `/v1` needs `X-API-K
 
 ## Layout
 
-    main.py, config/            settings (every value from .env), JSON logging
-    app/bootstrap.py            app factory: middleware, errors, /v1 with API key and rate limit
-    app/platform/               resources built at startup, database, checkpointer, Redis, locks, tracing, errors
-    app/engines/llm.py          the chat model through LiteLLM
-    app/cinema/                 the domain both features use: tables, store, seat layout, seed data
-    app/features/chat/          agent, tools, prompt, state, confirmation reader, service, SSE routes
-    app/features/catalog/       read-only films, showtimes and seats
-    app/features/bookings/      the booking form: book and list without a model
+    main.py                     entry point: uvicorn on the app from app/core/application.py
+    app/settings.py             every environment value, typed (pydantic-settings)
+    app/core/                   app factory, lifespan (the agent and every client built once at startup), database,
+                                checkpointer, Redis, locks, token budget, tracing, errors, logging, dependencies
+    app/middleware/             request id and access log, CORS, API keys, the Redis rate limit
+    app/routes/                 one APIRouter per area: chat (SSE), catalog, bookings, health
+    app/controllers/            thin handlers between routes and services
+    app/services/               business processes: the booking agent's graph, one chat turn around it
+    app/generative/             every prompt in prompts.py, and the reader of a typed yes or no
+    app/engines/llm.py          the chat model through LiteLLM (DeepSeek or Gemini)
+    app/tools/                  the agent's tools, each checked against the database
+    app/repositories/           every query: cinema store, conversation owners, seed data
+    app/models/                 SQLAlchemy tables
+    app/schemas/                Pydantic models for the API and the agent's state
+    app/utils/                  pure helpers: the cinema clock, the seat layout
     scripts/                    seed.py, run_scenarios.py
     evals/                      scenarios, results, what they found
     migrations/                 Alembic: 0001 the first schema, 0002 booking owner and channel

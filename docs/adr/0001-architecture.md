@@ -65,7 +65,9 @@ Options looked at on 8 November 2026:
 - The schema is created at startup. Add Alembic before changing a live database.
 - Not built: payment (the prompt says to pay at the counter with the booking code), user accounts beyond API keys,
   cancelling a booking, and a frontend. Gemini is configured but was not run live.
-- The layout follows the Lab's feature-first convention: `app/cinema` is the domain both features use,
-  `app/features/chat` and `app/features/catalog` never import each other, `app/platform/resources.py` builds everything.
+- The code is layered (changed on 8 November 2026, from the Lab's feature-first layout): routes declare HTTP,
+  controllers stay thin, services hold the business process (the agent's graph and a chat turn), generative holds
+  every prompt, tools and repositories touch the database. `app/core/lifespan.py` builds the agent and every client
+  once at startup, so a request only runs a turn.
 
 New decisions: copy this file as `NNNN-title.md`, state context, decision, consequences, and what it replaces.

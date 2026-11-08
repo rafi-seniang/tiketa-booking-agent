@@ -1,12 +1,15 @@
 """The migrations build the schema the code describes, and carry an older database's bookings forward."""
 
+import os
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
 
-from app.platform.migrations import ALEMBIC_INI
+from app.core.migrations import ALEMBIC_INI
 
 
 def alembic_config(database: Path) -> Config:
@@ -35,3 +38,14 @@ def test_bookings_made_before_the_form_belong_to_their_conversations_owner(tmp_p
         assert db.execute("SELECT owner, channel FROM bookings").fetchall() == [("key:key-0001", "chat")]
     command.downgrade(config, "0001")
     command.upgrade(config, "head")
+
+
+def test_the_alembic_command_sees_every_table(tmp_path: Path) -> None:
+    """In its own process, as `alembic check` runs in CI, with only what migrations/env.py imports."""
+    database_url = f"sqlite+aiosqlite:///{(tmp_path / 'cli.db').as_posix()}"
+    environment = {**os.environ, "DATABASE_URL": database_url}
+    for command_line in (["upgrade", "head"], ["check"]):
+        run = subprocess.run(
+            [sys.executable, "-m", "alembic", *command_line], env=environment, capture_output=True, text=True
+        )
+        assert run.returncode == 0, run.stderr

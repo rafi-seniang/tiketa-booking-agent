@@ -19,24 +19,13 @@ import httpx
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
-from app.cinema.clock import local_text
 from app.engines.llm import build_chat_model
-from config.settings import get_settings
+from app.generative.prompts import JUDGE_PROMPT
+from app.settings import get_settings
+from app.utils.clock import local_text
 
 SCENARIOS = Path("evals/scenarios.json")
 RESULTS = Path("evals/results")
-
-JUDGE_PROMPT = """You review a cinema ticket assistant. Judge only its latest reply. The history gives context.
-Now, in the cinema's timezone: {now_local}. Read dates such as "besok" or "lusa" from this.
-First check the language: the reply must be in the language of the user's latest message.
-The assistant can find showtimes, read seat maps and prepare a booking. The system then shows the user a summary to
-confirm or cancel, and books only after that. Events the system sent in this turn: {events}.
-A summary in the reply is what the user sees with Confirm and Cancel buttons: it counts as stating the booking and
-asking to confirm it.
-Fail when the reply ignores what was asked, contradicts the conversation or the tool results, invents films, times,
-prices, seats or bookings, uses another language than the user, claims a booking without a booking code, or does not
-match the expected behaviour. Unsure when it depends on data you cannot see. Otherwise pass.
-Expected behaviour: {expected}"""
 
 
 class Turn(BaseModel):

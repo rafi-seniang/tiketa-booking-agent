@@ -1,7 +1,7 @@
 """Runs the migrations on the service's own async engine.
 
 Only the service's tables are compared and migrated. LangGraph's checkpoint tables (made by the checkpointer's
-`setup()`) and Phoenix's schema share the database and are left alone.
+`setup()`) and Phoenix's schema (another Postgres schema) share the database and are left alone.
 """
 
 import asyncio
@@ -9,16 +9,16 @@ import asyncio
 from alembic import context
 from sqlalchemy import Connection
 
-import app.cinema.tables
-import app.features.chat.session_store  # noqa: F401  the tables register on Base.metadata when imported
-from app.platform.database import Base, connect_database
-from config.settings import get_settings
+import app.models  # noqa: F401  registers every table on Base.metadata
+from app.core.database import Base, connect_database
+from app.settings import get_settings
 
 target_metadata = Base.metadata
 
 
 def include_name(name: str | None, type_: str, parent_names: object) -> bool:
-    return type_ != "table" or name in target_metadata.tables
+    """Every table but LangGraph's own, so a table missing from the models shows up as a difference."""
+    return type_ != "table" or not (name or "").startswith("checkpoint")
 
 
 def database_url() -> str:
