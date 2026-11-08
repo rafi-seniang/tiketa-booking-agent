@@ -175,6 +175,8 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
             raise RuntimeError("book_tickets runs only as a tool call, whose id keeps the booking idempotent")
         request = BookingRequest(
             idempotency_key=runtime.tool_call_id,
+            owner=runtime.context.owner,
+            channel="chat",
             session_id=runtime.context.session_id,
             showtime_id=showtime_id,
             seats=seat_ids,

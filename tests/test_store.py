@@ -15,7 +15,13 @@ from conftest import CINEMA_TIMEZONE, DUNE, NOW
 
 def request(showtime_id: int, seats: list[str], key: str = "call-1", session_id: str = "s1") -> BookingRequest:
     return BookingRequest(
-        idempotency_key=key, session_id=session_id, showtime_id=showtime_id, seats=seats, customer_name="Rafi"
+        idempotency_key=key,
+        owner="key:key-0001",
+        channel="chat",
+        session_id=session_id,
+        showtime_id=showtime_id,
+        seats=seats,
+        customer_name="Rafi",
     )
 
 

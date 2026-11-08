@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import VERSION
+from app.features.bookings import router as bookings
 from app.features.catalog import router as catalog
 from app.features.chat import router as chat
 from app.features.health import router as health
@@ -29,13 +30,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_middleware(app)
     register_error_handlers(app)
     app.add_middleware(
-        CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["GET", "POST"], allow_headers=["*"]
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+        expose_headers=["Retry-After"],
     )
 
     # Key first, then the rate limit, so an unknown caller never spends a known caller's budget
     api = APIRouter(prefix="/v1", dependencies=[Depends(require_api_key), Depends(enforce_rate_limit)])
     api.include_router(chat.router)
+    api.include_router(chat.usage_router)
     api.include_router(catalog.router)
+    api.include_router(bookings.router)
     app.include_router(health.router)
     app.include_router(api)
     return app

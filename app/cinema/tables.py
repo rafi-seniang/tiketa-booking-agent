@@ -38,7 +38,9 @@ class BookingRow(Base):
     code: Mapped[str] = mapped_column(String(12), unique=True)
     # The agent's tool call id: a retried or resumed call finds its booking instead of making a second one
     idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
-    session_id: Mapped[str] = mapped_column(String(40), index=True)
+    owner: Mapped[str] = mapped_column(String(80), index=True)  # the caller (API key) the booking belongs to
+    channel: Mapped[str] = mapped_column(String(10))  # "chat" (the agent) or "web" (the booking form)
+    session_id: Mapped[str | None] = mapped_column(String(40), index=True)  # the conversation, for chat bookings
     showtime_id: Mapped[int] = mapped_column(ForeignKey("showtimes.id"))
     customer_name: Mapped[str] = mapped_column(String(80))
     total_price_idr: Mapped[int]

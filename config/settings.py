@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     redis_timeout_seconds: float = Field(default=2, gt=0)
     # Requests per caller (API key, or client address without one) per minute on /v1
     rate_limit_per_minute: int = Field(default=60, gt=0)
+    # Model tokens (input and output) per caller per UTC day on chat turns. A turn starts only below it
+    daily_tokens_per_caller: int = Field(default=400_000, gt=0)
     # How long a turn may hold its conversation before the lock expires on its own (a crashed worker)
     turn_lock_seconds: int = Field(default=180, gt=0)
 

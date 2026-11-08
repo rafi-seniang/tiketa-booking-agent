@@ -1,13 +1,16 @@
 # On Windows use Git Bash, or run the commands below by hand.
 PY ?= python
 
-.PHONY: install up seed dev test lint typecheck check scenarios
+.PHONY: install up migrate seed dev test lint typecheck check scenarios
 
 install:            ## create the venv and install with dev tools
 	$(PY) -m venv .venv && .venv/bin/pip install -e ".[dev]" || .venv/Scripts/pip install -e ".[dev]"
 
 up:                 ## Postgres, Redis and Phoenix
 	docker compose up -d
+
+migrate:            ## bring the database schema up to date (the service refuses an older one)
+	alembic upgrade head
 
 seed:               ## sample films and a week of showtimes
 	PYTHONPATH=. python scripts/seed.py --days 7

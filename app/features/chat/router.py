@@ -9,11 +9,12 @@ from fastapi.responses import StreamingResponse
 
 from app.features.chat.controller import ChatController
 from app.features.chat.dependencies import get_chat_controller
-from app.features.chat.schemas import ConfirmationIn, MessageIn, SessionCreated, SessionView
+from app.features.chat.schemas import ConfirmationIn, MessageIn, SessionCreated, SessionView, TokenUsageView
 from app.platform.dependencies import get_now
 from app.platform.rate_limit import caller_of
 
 router = APIRouter(prefix="/sessions", tags=["chat"])
+usage_router = APIRouter(tags=["chat"])
 Controller = Annotated[ChatController, Depends(get_chat_controller)]
 Caller = Annotated[str, Depends(caller_of)]
 Now = Annotated[datetime, Depends(get_now)]
@@ -44,3 +45,9 @@ async def answer_confirmation(
     session_id: UUID, body: ConfirmationIn, controller: Controller, caller: Caller, now: Now
 ) -> StreamingResponse:
     return await controller.answer_confirmation(session_id.hex, body, caller, now)
+
+
+@usage_router.get("/usage")
+async def token_usage(controller: Controller, caller: Caller) -> TokenUsageView:
+    """The caller's model tokens today against the daily budget. The booking form spends none."""
+    return await controller.token_usage(caller)

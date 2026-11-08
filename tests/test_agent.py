@@ -19,7 +19,7 @@ from fakes import ScriptedChatModel, calls, says
 
 Agent = CompiledStateGraph[Any, Any, Any, Any]
 CONFIG: Any = {"configurable": {"thread_id": "s1"}}
-CONTEXT = ChatContext(session_id="s1", now=NOW)
+CONTEXT = ChatContext(session_id="s1", owner="key:key-0001", now=NOW)
 
 
 def choose(showtime: Showtime, seats: list[str], name: str | None = "Rafi") -> tuple[str, dict[str, Any]]:
@@ -40,7 +40,13 @@ async def tool_messages(agent: Agent) -> list[ToolMessage]:
 
 async def someone_else_books(store: CinemaStore, showtime: Showtime, seats: list[str]) -> None:
     other = BookingRequest(
-        idempotency_key="other", session_id="s2", showtime_id=showtime.id, seats=seats, customer_name="X"
+        idempotency_key="other",
+        owner="key:someone",
+        channel="chat",
+        session_id="s2",
+        showtime_id=showtime.id,
+        seats=seats,
+        customer_name="X",
     )
     await store.book(other, NOW)
 

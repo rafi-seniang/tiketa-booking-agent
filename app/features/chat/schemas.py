@@ -55,6 +55,12 @@ class Turn(BaseModel):
     text: str
 
 
+class TokenUsageView(BaseModel):
+    used_tokens: int  # model tokens the caller's chat turns used today (UTC), input and output
+    daily_tokens: int
+    resets_in_seconds: int
+
+
 class SessionView(BaseModel):
     session_id: str
     turns: list[Turn]

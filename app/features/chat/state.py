@@ -32,6 +32,7 @@ class ChatContext:
     """Set by the service for each turn, never by the model: whose conversation it is and the time."""
 
     session_id: str
+    owner: str
     now: datetime
 
 

@@ -7,6 +7,8 @@ COPY pyproject.toml ./
 COPY main.py ./
 COPY app ./app
 COPY config ./config
+COPY alembic.ini ./
+COPY migrations ./migrations
 RUN pip wheel --wheel-dir /wheels .
 
 FROM python:3.12-slim AS runtime

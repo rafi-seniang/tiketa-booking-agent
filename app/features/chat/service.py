@@ -2,6 +2,7 @@
 checkpointer, keyed by session id, so any worker can take the next turn."""
 
 import logging
+import time
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
@@ -13,11 +14,12 @@ from langgraph.types import Command, StateSnapshot, StreamMode, StreamPart
 
 from app.cinema.store import CinemaStore
 from app.features.chat.confirmation import ConfirmationReader
-from app.features.chat.schemas import BookingSummary, ChatEvent, SessionView, Turn
+from app.features.chat.schemas import BookingSummary, ChatEvent, SessionView, TokenUsageView, Turn
 from app.features.chat.session_store import SessionStore
 from app.features.chat.state import ChatContext
-from app.platform.errors import Conflict
+from app.platform.errors import Conflict, RateLimited
 from app.platform.locks import KeyLock
+from app.platform.token_budget import TokenBudget, seconds_to_reset
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,10 @@ class TurnUsage:
             self.input_tokens += message.usage_metadata["input_tokens"]
             self.cached_input_tokens += message.usage_metadata.get("input_token_details", {}).get("cache_read") or 0
             self.output_tokens += message.usage_metadata["output_tokens"]
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
 
     def as_data(self) -> dict[str, int]:
         return {
@@ -94,6 +100,8 @@ class ChatService:
         store: CinemaStore,
         lock: KeyLock,
         turn_lock_seconds: int,
+        budget: TokenBudget,
+        daily_tokens: int,
     ) -> None:
         self._agent = agent
         self._reader = reader
@@ -101,6 +109,8 @@ class ChatService:
         self._store = store
         self._lock = lock
         self._turn_lock_seconds = turn_lock_seconds
+        self._budget = budget
+        self._daily_tokens = daily_tokens
 
     async def start_session(self, owner: str, now: datetime) -> str:
         return await self._sessions.create(owner, now)
@@ -121,15 +131,25 @@ class ChatService:
     async def pending_confirmation(self, session_id: str) -> BookingSummary | None:
         return pending_in(await self._agent.aget_state(config_of(session_id)))
 
-    async def begin_turn(self, session_id: str, answers_confirmation: bool = False) -> None:
-        """One turn at a time per conversation: a second one would interleave with the first."""
+    async def token_usage(self, owner: str) -> TokenUsageView:
+        return TokenUsageView(
+            used_tokens=await self._budget.used(owner),
+            daily_tokens=self._daily_tokens,
+            resets_in_seconds=seconds_to_reset(time.time()),
+        )
+
+    async def begin_turn(self, session_id: str, owner: str, answers_confirmation: bool = False) -> None:
+        """One turn at a time per conversation, within the caller's tokens for the day."""
+        if await self._budget.used(owner) >= self._daily_tokens:
+            reset = seconds_to_reset(time.time())
+            raise RateLimited(f"The {self._daily_tokens:,} model tokens for today are used up", reset)
         if not await self._lock.acquire(f"turn:{session_id}", self._turn_lock_seconds):
             raise Conflict("This conversation is still answering the previous message")
         if answers_confirmation and await self.pending_confirmation(session_id) is None:
             await self._lock.release(f"turn:{session_id}")
             raise Conflict("No booking is waiting for confirmation")
 
-    async def message_turn(self, session_id: str, text: str, now: datetime) -> AsyncIterator[ChatEvent]:
+    async def message_turn(self, session_id: str, owner: str, text: str, now: datetime) -> AsyncIterator[ChatEvent]:
         """The caller has begun the turn. It ends here, whatever happens."""
         try:
             try:
@@ -139,7 +159,7 @@ class ChatService:
                 yield ChatEvent(type="error", text=FAILED_TURN_TEXT)
                 yield ChatEvent(type="end", data=TurnUsage().as_data())
                 return
-            async for event in self._run(graph_input, session_id, now):
+            async for event in self._run(graph_input, session_id, owner, now):
                 yield event
         finally:
             await self._lock.release(f"turn:{session_id}")
@@ -153,21 +173,23 @@ class ChatService:
         await self._close_unfinished_tool_calls(session_id)
         return {"messages": [HumanMessage(text)]}
 
-    async def confirmation_turn(self, session_id: str, approved: bool, now: datetime) -> AsyncIterator[ChatEvent]:
+    async def confirmation_turn(
+        self, session_id: str, owner: str, approved: bool, now: datetime
+    ) -> AsyncIterator[ChatEvent]:
         """A Confirm or Cancel button press. The caller has begun the turn. It ends here, whatever happens."""
         try:
-            async for event in self._run(Command(resume={"approved": approved}), session_id, now):
+            async for event in self._run(Command(resume={"approved": approved}), session_id, owner, now):
                 yield event
         finally:
             await self._lock.release(f"turn:{session_id}")
 
-    async def _run(self, graph_input: Any, session_id: str, now: datetime) -> AsyncIterator[ChatEvent]:
+    async def _run(self, graph_input: Any, session_id: str, owner: str, now: datetime) -> AsyncIterator[ChatEvent]:
         usage = TurnUsage()
         try:
             async for part in self._agent.astream(
                 graph_input,
                 config_of(session_id),
-                context=ChatContext(session_id=session_id, now=now),
+                context=ChatContext(session_id=session_id, owner=owner, now=now),
                 stream_mode=STREAM_MODES,
                 version="v2",
             ):
@@ -176,6 +198,8 @@ class ChatService:
         except Exception:  # the response has started, so the failure travels as an event
             logger.exception("chat turn failed", extra={"extra_fields": {"session_id": session_id}})
             yield ChatEvent(type="error", text=FAILED_TURN_TEXT)
+        finally:  # a failed or abandoned turn still spent what it used
+            await self._budget.add(owner, usage.total_tokens)
         yield ChatEvent(type="end", data=usage.as_data())
 
     async def _close_unfinished_tool_calls(self, session_id: str) -> None:

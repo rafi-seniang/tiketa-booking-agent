@@ -18,17 +18,19 @@ from app.features.chat.agent import build_agent
 from app.features.chat.schemas import BookingSummary
 from app.features.chat.service import ChatService
 from app.features.chat.session_store import SessionStore
-from app.platform.database import Sessions, connect_database, create_tables
+from app.platform.database import Base, Sessions, connect_database
 from app.platform.dependencies import get_now, get_resources
 from app.platform.locks import InMemoryKeyLock
 from app.platform.rate_limit import InMemoryRateLimiter
 from app.platform.resources import Resources
+from app.platform.token_budget import InMemoryTokenBudget
 from config.settings import Settings
 
 from fakes import ScriptedChatModel
 
 CINEMA_TIMEZONE = ZoneInfo("Asia/Jakarta")
 NOW = datetime(2026, 11, 8, 3, 0, tzinfo=UTC)  # Sunday 10:00 in Jakarta
+OWNER = "key:key-0001"  # how caller_of names the test client's API key, test-key-0001
 DUNE = 9  # the film id of Dune: Part Two in the seed, shown at 12:30, 15:15, 18:00 and 20:45
 
 
@@ -62,7 +64,8 @@ def settings(tmp_path: Path) -> Settings:
 @pytest.fixture
 async def sessions(settings: Settings) -> AsyncIterator[Sessions]:
     engine, session_factory = connect_database(settings.database_url.get_secret_value())
-    await create_tables(engine)
+    async with engine.begin() as connection:  # migrations are tested on their own in test_migrations.py
+        await connection.run_sync(Base.metadata.create_all)
     await seed(session_factory, NOW.astimezone(CINEMA_TIMEZONE).date(), 2, CINEMA_TIMEZONE)
     yield session_factory
     await engine.dispose()
@@ -96,10 +99,20 @@ def reader() -> FakeReader:
 
 
 @pytest.fixture
+def budget() -> InMemoryTokenBudget:
+    return InMemoryTokenBudget()
+
+
+@pytest.fixture
 def chat(
-    agent: CompiledStateGraph[Any, Any, Any, Any], reader: FakeReader, sessions: Sessions, store: CinemaStore
+    agent: CompiledStateGraph[Any, Any, Any, Any],
+    reader: FakeReader,
+    sessions: Sessions,
+    store: CinemaStore,
+    budget: InMemoryTokenBudget,
 ) -> ChatService:
-    return ChatService(agent, reader, SessionStore(sessions), store, InMemoryKeyLock(), 60)  # type: ignore[arg-type]
+    reader_any: Any = reader  # FakeReader has the reader's one method
+    return ChatService(agent, reader_any, SessionStore(sessions), store, InMemoryKeyLock(), 60, budget, 10_000)
 
 
 @pytest.fixture
