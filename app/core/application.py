@@ -12,6 +12,7 @@ from app.core.logging import configure_logging
 from app.middleware.auth import GuestSessions, authenticate
 from app.middleware.cors import add_cors
 from app.middleware.request_log import register_middleware
+from app.middleware.security_headers import add_security_headers
 from app.routes import auth, bookings, catalog, chat, health
 from app.settings import Settings, get_settings
 
@@ -30,6 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     secret = settings.session_secret.get_secret_value() or secrets.token_urlsafe(32)
     app.state.guest_sessions = GuestSessions(secret, settings.guest_session_days)
     register_middleware(app)
+    add_security_headers(app, https_only=settings.environment == "production")
     register_error_handlers(app)
     add_cors(app, settings.cors_origins)
 

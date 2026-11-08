@@ -62,3 +62,10 @@ async def test_a_changed_or_expired_cookie_is_refused(
 def test_production_refuses_to_start_without_its_secrets() -> None:
     with pytest.raises(ValueError, match="SESSION_SECRET"):
         Settings(_env_file=None, environment="production", database_url="sqlite+aiosqlite://", api_keys="k")  # type: ignore[call-arg]
+
+
+async def test_private_answers_stay_out_of_caches_and_frames(client: httpx.AsyncClient) -> None:
+    bookings = await client.get("/v1/bookings")
+    assert bookings.headers["Cache-Control"] == "no-store"
+    assert bookings.headers["X-Content-Type-Options"] == "nosniff" and bookings.headers["X-Frame-Options"] == "DENY"
+    assert "no-store" not in (await client.get("/health")).headers.get("Cache-Control", "")
