@@ -16,10 +16,11 @@ from app.core.errors import Conflict, RateLimited
 from app.core.locks import KeyLock
 from app.core.token_budget import EVERYONE, TokenBudget, seconds_to_reset
 from app.generative.confirmation import ConfirmationReader
+from app.repositories.booking_api import BookingApi
 from app.repositories.chat_sessions import SessionStore
-from app.repositories.cinema import CinemaStore
 from app.schemas.agent import ChatContext
 from app.schemas.chat import BookingSummary, ChatEvent, SessionView, TokenUsageView, Turn
+from app.schemas.cinema import Caller
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ class ChatService:
         agent: CompiledStateGraph[Any, Any, Any, Any],
         reader: ConfirmationReader,
         sessions: SessionStore,
-        store: CinemaStore,
+        api: BookingApi,
         lock: KeyLock,
         turn_lock_seconds: int,
         budget: TokenBudget,
@@ -107,7 +108,7 @@ class ChatService:
         self._agent = agent
         self._reader = reader
         self._sessions = sessions
-        self._store = store
+        self._api = api
         self._lock = lock
         self._turn_lock_seconds = turn_lock_seconds
         self._budget = budget
@@ -120,14 +121,14 @@ class ChatService:
     async def check_owner(self, session_id: str, owner: str) -> None:
         await self._sessions.check_owner(session_id, owner)
 
-    async def view(self, session_id: str) -> SessionView:
+    async def view(self, session_id: str, caller: Caller) -> SessionView:
         snapshot = await self._agent.aget_state(config_of(session_id))
         return SessionView(
             session_id=session_id,
             turns=turns_of(snapshot.values.get("messages", [])),
             draft=dict(snapshot.values.get("draft", {})),
             pending_confirmation=pending_in(snapshot),
-            bookings=await self._store.bookings_for_session(session_id),
+            bookings=await self._api.bookings_of_session(session_id, caller),
         )
 
     async def pending_confirmation(self, session_id: str) -> BookingSummary | None:
@@ -145,7 +146,7 @@ class ChatService:
         if await self._budget.used(EVERYONE) >= self._daily_tokens_total:
             reset = seconds_to_reset(time.time())
             raise RateLimited(
-                "The chat is closed for today: its model budget is used up. The booking form still works", reset
+                "The chat is closed for today: its model budget is used up. The seat map still books", reset
             )
         if await self._budget.used(owner) >= self._daily_tokens:
             reset = seconds_to_reset(time.time())
@@ -156,7 +157,7 @@ class ChatService:
             await self._lock.release(f"turn:{session_id}")
             raise Conflict("No booking is waiting for confirmation")
 
-    async def message_turn(self, session_id: str, owner: str, text: str, now: datetime) -> AsyncIterator[ChatEvent]:
+    async def message_turn(self, session_id: str, caller: Caller, text: str, now: datetime) -> AsyncIterator[ChatEvent]:
         """The caller has begun the turn. It ends here, whatever happens."""
         try:
             try:
@@ -166,7 +167,7 @@ class ChatService:
                 yield ChatEvent(type="error", text=FAILED_TURN_TEXT)
                 yield ChatEvent(type="end", data=TurnUsage().as_data())
                 return
-            async for event in self._run(graph_input, session_id, owner, now):
+            async for event in self._run(graph_input, session_id, caller, now):
                 yield event
         finally:
             await self._lock.release(f"turn:{session_id}")
@@ -181,22 +182,22 @@ class ChatService:
         return {"messages": [HumanMessage(text)]}
 
     async def confirmation_turn(
-        self, session_id: str, owner: str, approved: bool, now: datetime
+        self, session_id: str, caller: Caller, approved: bool, now: datetime
     ) -> AsyncIterator[ChatEvent]:
         """A Confirm or Cancel button press. The caller has begun the turn. It ends here, whatever happens."""
         try:
-            async for event in self._run(Command(resume={"approved": approved}), session_id, owner, now):
+            async for event in self._run(Command(resume={"approved": approved}), session_id, caller, now):
                 yield event
         finally:
             await self._lock.release(f"turn:{session_id}")
 
-    async def _run(self, graph_input: Any, session_id: str, owner: str, now: datetime) -> AsyncIterator[ChatEvent]:
+    async def _run(self, graph_input: Any, session_id: str, caller: Caller, now: datetime) -> AsyncIterator[ChatEvent]:
         usage = TurnUsage()
         try:
             async for part in self._agent.astream(
                 graph_input,
                 config_of(session_id),
-                context=ChatContext(session_id=session_id, owner=owner, now=now),
+                context=ChatContext(session_id=session_id, caller=caller, now=now),
                 stream_mode=STREAM_MODES,
                 version="v2",
             ):
@@ -206,7 +207,7 @@ class ChatService:
             logger.exception("chat turn failed", extra={"extra_fields": {"session_id": session_id}})
             yield ChatEvent(type="error", text=FAILED_TURN_TEXT)
         finally:  # a failed or abandoned turn still spent what it used
-            await self._budget.add(owner, usage.total_tokens)
+            await self._budget.add(caller.name, usage.total_tokens)
         yield ChatEvent(type="end", data=usage.as_data())
 
     async def _close_unfinished_tool_calls(self, session_id: str) -> None:

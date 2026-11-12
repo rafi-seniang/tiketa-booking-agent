@@ -3,7 +3,6 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -16,22 +15,20 @@ from app.core.dependencies import get_now, get_resources
 from app.core.lifespan import Resources
 from app.core.locks import InMemoryKeyLock
 from app.core.token_budget import InMemoryTokenBudget
-from app.middleware.rate_limit import InMemoryRateLimiter, key_id
+from app.middleware.rate_limit import InMemoryRateLimiter
 from app.repositories.chat_sessions import SessionStore
-from app.repositories.cinema import CinemaStore
-from app.repositories.seed import seed
 from app.schemas.chat import BookingSummary
-from app.schemas.cinema import Showtime
+from app.schemas.cinema import Caller, Showtime
 from app.services.booking_agent import build_agent
 from app.services.chat import ChatService
 from app.settings import Settings
 
-from fakes import ScriptedChatModel
+from fakes import FakeBookingApi, ScriptedChatModel
 
-CINEMA_TIMEZONE = ZoneInfo("Asia/Jakarta")
 NOW = datetime(2026, 11, 8, 3, 0, tzinfo=UTC)  # Sunday 10:00 in Jakarta
-OWNER = key_id("test-key-0001")  # the caller the test client's API key stands for
-DUNE = 9  # the film id of Dune: Part Two in the seed, shown at 12:30, 15:15, 18:00 and 20:45
+API_KEY = "test-key-0001"
+OWNER = f"key:{API_KEY}"  # how the fake booking API names the test client's caller
+CALLER = Caller(name=OWNER, credentials={"X-API-Key": API_KEY})
 
 
 class FakeReader:
@@ -56,8 +53,7 @@ def settings(tmp_path: Path) -> Settings:
     return Settings(  # type: ignore[call-arg]
         _env_file=None,
         environment="test",
-        api_keys="test-key-0001,other-key-0002",
-        database_url=f"sqlite+aiosqlite:///{(tmp_path / 'tiketa.db').as_posix()}",
+        database_url=f"sqlite+aiosqlite:///{(tmp_path / 'agent.db').as_posix()}",
     )
 
 
@@ -66,19 +62,19 @@ async def sessions(settings: Settings) -> AsyncIterator[Sessions]:
     engine, session_factory = connect_database(settings.database_url.get_secret_value())
     async with engine.begin() as connection:  # migrations are tested on their own in test_migrations.py
         await connection.run_sync(Base.metadata.create_all)
-    await seed(session_factory, NOW.astimezone(CINEMA_TIMEZONE).date(), 2, CINEMA_TIMEZONE)
     yield session_factory
     await engine.dispose()
 
 
 @pytest.fixture
-def store(sessions: Sessions) -> CinemaStore:
-    return CinemaStore(sessions, CINEMA_TIMEZONE)
+def api() -> FakeBookingApi:
+    """The booking service the agent books through, in memory."""
+    return FakeBookingApi(NOW)
 
 
 @pytest.fixture
-async def dune_today(store: CinemaStore) -> list[Showtime]:
-    return await store.showtimes_on(NOW.astimezone(CINEMA_TIMEZONE).date(), NOW, DUNE)
+def dune_today(api: FakeBookingApi) -> list[Showtime]:
+    return api.showtimes  # Dune at 12:00, 15:00, 18:00 and 21:00 today
 
 
 @pytest.fixture
@@ -88,9 +84,12 @@ def model() -> ScriptedChatModel:
 
 @pytest.fixture
 async def agent(
-    model: ScriptedChatModel, store: CinemaStore, settings: Settings
+    model: ScriptedChatModel, api: FakeBookingApi, settings: Settings
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
-    return build_agent(model, store, await store.list_movies(), settings, CINEMA_TIMEZONE, InMemorySaver())
+    api_any: Any = api  # FakeBookingApi has the client's methods
+    return build_agent(
+        model, api_any, await api.list_movies(CALLER), await api.cinema(CALLER), settings, InMemorySaver()
+    )
 
 
 @pytest.fixture
@@ -108,21 +107,23 @@ def chat(
     agent: CompiledStateGraph[Any, Any, Any, Any],
     reader: FakeReader,
     sessions: Sessions,
-    store: CinemaStore,
+    api: FakeBookingApi,
     budget: InMemoryTokenBudget,
 ) -> ChatService:
     reader_any: Any = reader  # FakeReader has the reader's one method
-    return ChatService(agent, reader_any, SessionStore(sessions), store, InMemoryKeyLock(), 60, budget, 10_000, 50_000)
+    api_any: Any = api
+    return ChatService(
+        agent, reader_any, SessionStore(sessions), api_any, InMemoryKeyLock(), 60, budget, 10_000, 50_000
+    )
 
 
 @pytest.fixture
-async def client(settings: Settings, chat: ChatService, store: CinemaStore) -> AsyncIterator[httpx.AsyncClient]:
+async def client(settings: Settings, chat: ChatService, api: FakeBookingApi) -> AsyncIterator[httpx.AsyncClient]:
     app = create_app(settings)
-    resources = Resources(chat=chat, store=store, rate_limiter=InMemoryRateLimiter(), model_name="scripted")
+    api_any: Any = api
+    resources = Resources(chat=chat, api=api_any, rate_limiter=InMemoryRateLimiter(), model_name="scripted")
     app.dependency_overrides[get_resources] = lambda: resources
     app.dependency_overrides[get_now] = lambda: NOW
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", headers={"X-API-Key": "test-key-0001"}
-    ) as http:
+    async with httpx.AsyncClient(transport=transport, base_url="http://test", headers={"X-API-Key": API_KEY}) as http:
         yield http

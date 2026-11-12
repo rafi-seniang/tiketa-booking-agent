@@ -1,8 +1,10 @@
-"""The agent's tools. Reads are free. Changes go through checks in code, and a booking waits for the user's yes."""
+"""The agent's tools. Reads are free. Changes go through checks in code, and a booking waits for the user's yes.
+
+Films, showtimes, seats and bookings belong to the booking API. Every tool asks it as the person in the conversation.
+"""
 
 import json
 from datetime import date, datetime
-from zoneinfo import ZoneInfo
 
 from langchain.tools import BaseTool, ToolRuntime, tool
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -10,12 +12,11 @@ from langgraph.types import Command, interrupt
 from pydantic import BaseModel, Field
 
 from app.core.errors import Conflict
-from app.repositories.cinema import CinemaStore
+from app.repositories.booking_api import BookingApi, idempotency_key_of
 from app.schemas.agent import CLEARED_AFTER_BOOKING, ChatContext, Draft, TiketaState, merge_draft, missing_fields
 from app.schemas.chat import BookingSummary, ConfirmationAnswer
-from app.schemas.cinema import BookingRequest, CustomerName, SeatIds, Showtime
-from app.utils.clock import local_text
-from app.utils.seat_layout import SEAT_MAP_LEGEND, seat_map_text
+from app.schemas.cinema import BookingOrder, Caller, CustomerName, SeatIds, Showtime
+from app.utils.seat_map import seat_ids_of, seat_map_legend, seat_map_text, taken_seat_ids_of
 
 Runtime = ToolRuntime[ChatContext, TiketaState]
 
@@ -39,9 +40,11 @@ class UpdateBookingArgs(BaseModel):
     customer_name: CustomerName | None = Field(default=None, description="The name the booking is under")
 
 
-def showtime_label(showtime: Showtime, cinema_timezone: ZoneInfo) -> str:
-    when = local_text(showtime.starts_at, cinema_timezone)
-    return f"{showtime.movie_title}, {when}, studio {showtime.studio_number}, {showtime.price_idr} IDR per seat"
+def showtime_label(showtime: Showtime) -> str:
+    return (
+        f"{showtime.movie_title}, {showtime.starts_at_local}, studio {showtime.studio_number}, "
+        f"{showtime.price_idr} IDR per seat"
+    )
 
 
 def draft_text(draft: Draft) -> str:
@@ -60,9 +63,16 @@ def refuse_started_showtime(showtime: Showtime, now: datetime) -> None:
         raise Conflict("This showtime has already started")
 
 
-def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -> list[BaseTool]:
-    async def refuse_taken_seats(showtime_id: int, seat_ids: list[str]) -> None:
-        taken = await store.taken_seat_ids(showtime_id)
+def build_tools(api: BookingApi, max_seats: int) -> list[BaseTool]:
+    async def refuse_unknown_or_taken_seats(showtime_id: int, seat_ids: list[str], caller: Caller) -> None:
+        seat_map = await api.seat_map(showtime_id, caller)
+        known = seat_ids_of(seat_map)
+        unknown = [seat_id for seat_id in seat_ids if seat_id not in known]
+        if unknown:
+            raise Conflict(
+                f"{', '.join(unknown)} is not a seat in this studio. Seat ids look like D7: a row letter, then a number"
+            )
+        taken = taken_seat_ids_of(seat_map)
         taken_now = [seat_id for seat_id in seat_ids if seat_id in taken]
         if taken_now:
             raise Conflict(f"Already taken: {', '.join(taken_now)}. Read the seat map again")
@@ -70,7 +80,7 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
     @tool(args_schema=FindShowtimesArgs)
     async def find_showtimes(day: date, runtime: Runtime, movie_id: int | None = None) -> str:
         """Showtimes on one day that have not started yet, with price per seat and seats left."""
-        showtimes = await store.showtimes_on(day, runtime.context.now, movie_id)
+        showtimes = await api.showtimes_on(day, movie_id, runtime.context.caller)
         if not showtimes:
             return f"No showtimes left on {day:%A %d %B %Y}."
         rows = [
@@ -78,7 +88,7 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
                 "showtime_id": showtime.id,
                 "film": showtime.movie_title,
                 "movie_id": showtime.movie_id,
-                "starts": local_text(showtime.starts_at, cinema_timezone),
+                "starts": showtime.starts_at_local,
                 "studio": showtime.studio_number,
                 "price_idr": showtime.price_idr,
                 "seats_left": showtime.seats_left,
@@ -88,17 +98,16 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
         return json.dumps(rows, ensure_ascii=False)
 
     @tool(args_schema=MovieArgs)
-    async def get_movie_details(movie_id: int) -> str:
+    async def get_movie_details(movie_id: int, runtime: Runtime) -> str:
         """A film's synopsis, year, genres and studio."""
-        movie = await store.get_movie(movie_id)
-        return movie.model_dump_json(exclude={"poster_url", "trailer_youtube_id"})
+        movie = await api.get_movie(movie_id, runtime.context.caller)
+        return movie.model_dump_json()
 
     @tool(args_schema=ShowtimeArgs)
-    async def get_seat_map(showtime_id: int) -> str:
+    async def get_seat_map(showtime_id: int, runtime: Runtime) -> str:
         """The seat map of a showtime, with the seats already taken. Read it before choosing seats."""
-        showtime = await store.get_showtime(showtime_id)
-        taken = await store.taken_seat_ids(showtime_id)
-        return f"{showtime_label(showtime, cinema_timezone)}\n{SEAT_MAP_LEGEND}\n{seat_map_text(taken)}"
+        seat_map = await api.seat_map(showtime_id, runtime.context.caller)
+        return f"{showtime_label(seat_map.showtime)}\n{seat_map_legend(seat_map)}\n{seat_map_text(seat_map)}"
 
     @tool(args_schema=UpdateBookingArgs)
     async def update_booking(
@@ -112,10 +121,10 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
         change = Draft()
         chosen_showtime_id = draft.get("showtime_id")
         if showtime_id is not None:
-            showtime = await store.get_showtime(showtime_id)
+            showtime = await api.get_showtime(showtime_id, runtime.context.caller)
             refuse_started_showtime(showtime, runtime.context.now)
             change["showtime_id"] = showtime.id
-            change["showtime_label"] = showtime_label(showtime, cinema_timezone)
+            change["showtime_label"] = showtime_label(showtime)
             if showtime.id != chosen_showtime_id:  # seats belong to one showtime
                 change["seats"] = []
             chosen_showtime_id = showtime.id
@@ -124,7 +133,7 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
                 raise Conflict("Choose a showtime before the seats")
             if len(seats) > max_seats:
                 raise Conflict(f"At most {max_seats} seats per booking")
-            await refuse_taken_seats(chosen_showtime_id, seats)
+            await refuse_unknown_or_taken_seats(chosen_showtime_id, seats, runtime.context.caller)
             change["seats"] = seats
         if customer_name is not None:
             change["customer_name"] = customer_name
@@ -144,15 +153,15 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
         showtime_id, seat_ids, customer_name = draft["showtime_id"], draft["seats"], draft["customer_name"]
         if showtime_id is None or customer_name is None:  # missing_fields already refused these, for the type checker
             raise Conflict("The booking is not complete")
-        showtime = await store.get_showtime(showtime_id)
-        now = runtime.context.now
-        refuse_started_showtime(showtime, now)
-        await refuse_taken_seats(showtime_id, seat_ids)
+        context = runtime.context
+        showtime = await api.get_showtime(showtime_id, context.caller)
+        refuse_started_showtime(showtime, context.now)
+        await refuse_unknown_or_taken_seats(showtime_id, seat_ids, context.caller)
         summary = BookingSummary(
             showtime_id=showtime.id,
             movie_title=showtime.movie_title,
             starts_at=showtime.starts_at,
-            starts_at_local=local_text(showtime.starts_at, cinema_timezone),
+            starts_at_local=showtime.starts_at_local,
             studio_number=showtime.studio_number,
             seats=seat_ids,
             customer_name=customer_name,
@@ -174,20 +183,16 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
             return Command(update={"messages": [declined, *typed_reply]})
         if runtime.tool_call_id is None:
             raise RuntimeError("book_tickets runs only as a tool call, whose id keeps the booking idempotent")
-        request = BookingRequest(
-            idempotency_key=runtime.tool_call_id,
-            owner=runtime.context.owner,
-            channel="chat",
-            session_id=runtime.context.session_id,
-            showtime_id=showtime_id,
-            seats=seat_ids,
-            customer_name=customer_name,
+        order = BookingOrder(
+            showtime_id=showtime_id, seats=seat_ids, customer_name=customer_name, session_id=context.session_id
         )
-        booking = await store.book(request, now)
+        # The booking API decides: it prices the seats itself and refuses any that were sold in the meantime
+        idempotency_key = idempotency_key_of(context.session_id, runtime.tool_call_id)
+        booking = await api.book(order, idempotency_key, context.caller)
         runtime.stream_writer({"booking": booking.model_dump(mode="json")})
         booked = ToolMessage(
             f"The user confirmed and it is booked. Booking code {booking.code}: "
-            f"{showtime_label(booking.showtime, cinema_timezone)}, seats "
+            f"{showtime_label(booking.showtime)}, seats "
             f"{', '.join(booking.seats)}, name {booking.customer_name}, total {booking.total_price_idr} IDR.",
             tool_call_id=runtime.tool_call_id,
         )
@@ -196,7 +201,7 @@ def build_tools(store: CinemaStore, cinema_timezone: ZoneInfo, max_seats: int) -
     @tool
     async def list_my_bookings(runtime: Runtime) -> str:
         """The bookings made in this conversation."""
-        bookings = await store.bookings_for_session(runtime.context.session_id)
+        bookings = await api.bookings_of_session(runtime.context.session_id, runtime.context.caller)
         if not bookings:
             return "No bookings in this conversation yet."
         return json.dumps([booking.model_dump(mode="json") for booking in bookings], ensure_ascii=False)

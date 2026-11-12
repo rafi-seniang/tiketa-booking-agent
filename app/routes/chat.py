@@ -11,11 +11,12 @@ from app.controllers.chat import ChatController
 from app.core.dependencies import get_chat_controller, get_now
 from app.middleware.auth import authenticate
 from app.schemas.chat import ConfirmationIn, MessageIn, SessionCreated, SessionView, TokenUsageView
+from app.schemas.cinema import Caller
 
 router = APIRouter(prefix="/sessions", tags=["chat"])
 usage_router = APIRouter(tags=["chat"])
 Controller = Annotated[ChatController, Depends(get_chat_controller)]
-Caller = Annotated[str, Depends(authenticate)]
+CurrentCaller = Annotated[Caller, Depends(authenticate)]
 Now = Annotated[datetime, Depends(get_now)]
 EVENT_STREAM: dict[int | str, dict[str, Any]] = {
     200: {"content": {"text/event-stream": {}}, "description": "ChatEvent objects, one per data: line"}
@@ -23,30 +24,30 @@ EVENT_STREAM: dict[int | str, dict[str, Any]] = {
 
 
 @router.post("", status_code=201)
-async def start_session(controller: Controller, caller: Caller, now: Now) -> SessionCreated:
+async def start_session(controller: Controller, caller: CurrentCaller, now: Now) -> SessionCreated:
     return await controller.start(caller, now)
 
 
 @router.get("/{session_id}")
-async def get_session(session_id: UUID, controller: Controller, caller: Caller) -> SessionView:
+async def get_session(session_id: UUID, controller: Controller, caller: CurrentCaller) -> SessionView:
     return await controller.view(session_id.hex, caller)
 
 
 @router.post("/{session_id}/messages", response_class=StreamingResponse, responses=EVENT_STREAM)
 async def send_message(
-    session_id: UUID, body: MessageIn, controller: Controller, caller: Caller, now: Now
+    session_id: UUID, body: MessageIn, controller: Controller, caller: CurrentCaller, now: Now
 ) -> StreamingResponse:
     return await controller.send_message(session_id.hex, body, caller, now)
 
 
 @router.post("/{session_id}/confirmation", response_class=StreamingResponse, responses=EVENT_STREAM)
 async def answer_confirmation(
-    session_id: UUID, body: ConfirmationIn, controller: Controller, caller: Caller, now: Now
+    session_id: UUID, body: ConfirmationIn, controller: Controller, caller: CurrentCaller, now: Now
 ) -> StreamingResponse:
     return await controller.answer_confirmation(session_id.hex, body, caller, now)
 
 
 @usage_router.get("/usage")
-async def token_usage(controller: Controller, caller: Caller) -> TokenUsageView:
-    """The caller's model tokens today against the daily budget. The booking form spends none."""
+async def token_usage(controller: Controller, caller: CurrentCaller) -> TokenUsageView:
+    """The caller's model tokens today against the daily budget."""
     return await controller.token_usage(caller)
