@@ -67,10 +67,11 @@ Full rows, with every reply and verdict: `results/2026-11-08-deepseek-flash-thin
 - 17 turns is a small sample, and one run of each setting. A difference of one turn is one turn.
 - The judge is a model. It agreed with every failure read by hand, but it also once passed a reply in the wrong
   language before its prompt changed.
-- Bookings from runs stay in the database. Run `scripts/seed.py` on a fresh database for a clean count.
+- Bookings from runs stay in the booking service's database, like any other booking.
 
 ## Run
 
-    docker compose up -d && python scripts/seed.py && python main.py
+    # tiketa-app running on :8070 with this week published, then
+    docker compose up -d && python main.py
     PYTHONPATH=. python scripts/run_scenarios.py              # about 85k agent tokens a run
     PYTHONPATH=. python scripts/run_scenarios.py --only "seats described" --no-judge
