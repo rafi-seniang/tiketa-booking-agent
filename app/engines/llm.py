@@ -1,4 +1,5 @@
-"""Chat models through LiteLLM. The model name alone switches provider: deepseek/..., gemini/..., and so on."""
+"""Chat models through LiteLLM. The model name alone switches provider: deepseek/..., gemini/..., and so on.
+With LLM_GATEWAY_URL set, every call goes through that gateway instead."""
 
 import litellm
 from langchain_litellm import ChatLiteLLM
@@ -39,4 +40,29 @@ def build_chat_model(model: str, settings: Settings, reasoning_effort: str | Non
         # LiteLLM turns "none" into DeepSeek's thinking: disabled, and passes reasoning back when it is on
         model_kwargs={"reasoning_effort": reasoning_effort or settings.llm_reasoning_effort},
         stream_options={"include_usage": True},
+    )
+
+
+def build_agent_model(settings: Settings, reasoning_effort: str | None = None) -> ChatLiteLLM:
+    """The model the agent talks through: the gateway when one is set, otherwise the provider directly."""
+    if settings.llm_gateway_url:
+        return build_gateway_model(settings)
+    return build_chat_model(settings.llm_model, settings, reasoning_effort)
+
+
+def build_gateway_model(settings: Settings) -> ChatLiteLLM:
+    """The same calls through an OpenAI-compatible gateway, which picks the model and holds the provider's key.
+
+    A gateway that masks text answers in one piece, so streaming is turned off here and each reply arrives whole.
+    Thinking is off too: its reasoning would have to pass back through the gateway on every tool call.
+    """
+    return ChatLiteLLM(
+        model=f"openai/{settings.llm_gateway_model}",  # LiteLLM's name for "speak the OpenAI protocol to api_base"
+        api_base=settings.llm_gateway_url,
+        api_key=settings.llm_gateway_api_key.get_secret_value() or "no-key",  # the client refuses an empty one
+        temperature=settings.llm_temperature,
+        max_tokens=settings.llm_max_output_tokens,
+        request_timeout=settings.llm_timeout_seconds,
+        max_retries=settings.llm_max_attempts,
+        disable_streaming=True,
     )

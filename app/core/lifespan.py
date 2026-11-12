@@ -15,7 +15,7 @@ from app.core.migrations import check_schema
 from app.core.redis import connect_redis
 from app.core.token_budget import InMemoryTokenBudget, RedisTokenBudget, TokenBudget
 from app.core.tracing import start_tracing
-from app.engines.llm import build_chat_model
+from app.engines.llm import build_agent_model
 from app.generative.confirmation import ConfirmationReader
 from app.middleware.rate_limit import InMemoryRateLimiter, RateLimiter, RedisRateLimiter
 from app.repositories.booking_api import BookingApi
@@ -64,10 +64,10 @@ async def open_resources(settings: Settings) -> AsyncIterator[Resources]:
         rate_limiter: RateLimiter = RedisRateLimiter(redis) if redis is not None else InMemoryRateLimiter()
         lock: KeyLock = RedisKeyLock(redis) if redis is not None else InMemoryKeyLock()
         budget: TokenBudget = RedisTokenBudget(redis) if redis is not None else InMemoryTokenBudget()
-        model = build_chat_model(settings.llm_model, settings)
+        model = build_agent_model(settings)
         agent = build_agent(model, api, movies, cinema, settings, checkpointer)
         # A yes or no needs no thinking, and DeepSeek refuses the reader's forced tool call in thinking mode
-        reader = ConfirmationReader(build_chat_model(settings.llm_model, settings, reasoning_effort="none"))
+        reader = ConfirmationReader(build_agent_model(settings, reasoning_effort="none"))
         chat = ChatService(
             agent,
             reader,

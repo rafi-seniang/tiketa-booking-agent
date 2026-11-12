@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=60, gt=0)
     # Attempts at one model call, counting the first, on timeouts, 429 and 5xx before the turn fails
     llm_max_attempts: int = Field(default=3, gt=0)
+    # An OpenAI-compatible gateway in front of the model (Gatekeeper: masking and injection checks). Empty calls
+    # the provider directly. With a gateway, replies arrive whole instead of token by token and thinking is off,
+    # because the gateway answers in one piece
+    llm_gateway_url: str = ""
+    llm_gateway_api_key: SecretStr = SecretStr("")
+    # The model name the gateway is asked for. Gatekeeper takes "small" or "strong"
+    llm_gateway_model: str = "small"
     # Model calls one turn may make. Past it the turn stops with an error instead of looping
     max_model_calls_per_turn: int = Field(default=10, gt=0)
     # Older messages are summarised once a conversation passes this many tokens
