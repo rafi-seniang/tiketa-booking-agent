@@ -1,11 +1,9 @@
-"""The Lab backend contract."""
+"""What the service says about itself."""
 
 from pydantic import BaseModel
 
 
 class ServiceMeta(BaseModel):
-    """What the lab frontend's lobby shows about this backend (the Lab backend contract)."""
-
     id: str
     name: str
     summary: str

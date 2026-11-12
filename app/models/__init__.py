@@ -3,6 +3,6 @@
 Importing this package registers every table on Base.metadata, which Alembic compares against the database.
 """
 
-from app.models import chat, cinema
+from app.models import chat
 
-__all__ = ["chat", "cinema"]
+__all__ = ["chat"]

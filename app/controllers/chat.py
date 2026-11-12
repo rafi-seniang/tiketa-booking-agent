@@ -13,6 +13,7 @@ from app.schemas.chat import (
     SessionView,
     TokenUsageView,
 )
+from app.schemas.cinema import Caller
 from app.services.chat import ChatService
 
 
@@ -30,24 +31,24 @@ class ChatController:
     def __init__(self, service: ChatService) -> None:
         self._service = service
 
-    async def start(self, owner: str, now: datetime) -> SessionCreated:
-        return SessionCreated(session_id=await self._service.start_session(owner, now))
+    async def start(self, caller: Caller, now: datetime) -> SessionCreated:
+        return SessionCreated(session_id=await self._service.start_session(caller.name, now))
 
-    async def view(self, session_id: str, owner: str) -> SessionView:
-        await self._service.check_owner(session_id, owner)
-        return await self._service.view(session_id)
+    async def view(self, session_id: str, caller: Caller) -> SessionView:
+        await self._service.check_owner(session_id, caller.name)
+        return await self._service.view(session_id, caller)
 
-    async def send_message(self, session_id: str, body: MessageIn, owner: str, now: datetime) -> StreamingResponse:
-        await self._service.check_owner(session_id, owner)  # 404 and 409 go out before the stream starts
-        await self._service.begin_turn(session_id, owner)
-        return event_stream(self._service.message_turn(session_id, owner, body.message, now))
+    async def send_message(self, session_id: str, body: MessageIn, caller: Caller, now: datetime) -> StreamingResponse:
+        await self._service.check_owner(session_id, caller.name)  # 404 and 409 go out before the stream starts
+        await self._service.begin_turn(session_id, caller.name)
+        return event_stream(self._service.message_turn(session_id, caller, body.message, now))
 
     async def answer_confirmation(
-        self, session_id: str, body: ConfirmationIn, owner: str, now: datetime
+        self, session_id: str, body: ConfirmationIn, caller: Caller, now: datetime
     ) -> StreamingResponse:
-        await self._service.check_owner(session_id, owner)
-        await self._service.begin_turn(session_id, owner, answers_confirmation=True)
-        return event_stream(self._service.confirmation_turn(session_id, owner, body.approved, now))
+        await self._service.check_owner(session_id, caller.name)
+        await self._service.begin_turn(session_id, caller.name, answers_confirmation=True)
+        return event_stream(self._service.confirmation_turn(session_id, caller, body.approved, now))
 
-    async def token_usage(self, owner: str) -> TokenUsageView:
-        return await self._service.token_usage(owner)
+    async def token_usage(self, caller: Caller) -> TokenUsageView:
+        return await self._service.token_usage(caller.name)

@@ -25,9 +25,9 @@ from langgraph.types import Command
 from app.core.errors import Conflict, NotFound
 from app.engines.llm import STREAM_DROPPED_ERRORS
 from app.generative.prompts import system_prompt, turn_context
-from app.repositories.cinema import CinemaStore
+from app.repositories.booking_api import BookingApi
 from app.schemas.agent import ChatContext, Draft, TiketaState
-from app.schemas.cinema import Movie
+from app.schemas.cinema import Cinema, Movie
 from app.settings import Settings
 from app.tools.booking import build_tools
 
@@ -45,12 +45,14 @@ async def report_refusals(
 
 def build_agent(
     model: BaseChatModel,
-    store: CinemaStore,
+    api: BookingApi,
     movies: list[Movie],
+    cinema: Cinema,
     settings: Settings,
-    cinema_timezone: ZoneInfo,
     checkpointer: BaseCheckpointSaver[Any],
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
+    cinema_timezone = ZoneInfo(cinema.timezone)
+
     @wrap_model_call
     async def add_turn_context(
         request: ModelRequest[ChatContext], handler: Callable[[ModelRequest[ChatContext]], Awaitable[ModelResponse]]
@@ -74,8 +76,8 @@ def build_agent(
     ]
     return create_agent(
         model=model,
-        system_prompt=system_prompt(movies, settings.cinema_name, settings.max_seats_per_booking),
-        tools=build_tools(store, cinema_timezone, settings.max_seats_per_booking),
+        system_prompt=system_prompt(movies, cinema.name, cinema.max_seats_per_booking),
+        tools=build_tools(api, cinema.max_seats_per_booking),
         middleware=middleware,
         state_schema=TiketaState,
         context_schema=ChatContext,

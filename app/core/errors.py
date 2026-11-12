@@ -24,8 +24,20 @@ class AppError(Exception):
         self.extra = extra or {}
 
 
+class Unauthorized(AppError):
+    """The booking service does not accept the credentials the caller sent."""
+
+    status, title = 401, "Unauthorized"
+
+
 class NotFound(AppError):
     status, title = 404, "Not found"
+
+
+class BookingApiUnavailable(AppError):
+    """The booking service is down or misbehaving. The agent cannot stand in for it, so the request fails."""
+
+    status, title = 503, "Booking service unavailable"
 
 
 class Conflict(AppError):

@@ -1,7 +1,7 @@
 [project]
 name = "tiketa"
-version = "0.1.0"
-description = "A cinema booking assistant on LangGraph: free conversation, booking rules in code, confirmation before any booking"
+version = "0.2.0"
+description = "Tiketa's chat agent on LangGraph: free conversation, a confirmation before any booking, bookings made through the booking service"
 requires-python = ">=3.12"
 # The LLM stack is pinned exactly: litellm 1.82.7 and 1.82.8 were published with malware in March 2026,
 # so a new version is taken on purpose, after it has been public for a while, never by a fresh install.

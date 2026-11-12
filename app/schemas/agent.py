@@ -6,6 +6,8 @@ from typing import Annotated, NotRequired, TypedDict
 
 from langchain.agents import AgentState
 
+from app.schemas.cinema import Caller
+
 
 class Draft(TypedDict, total=False):
     """Only update_booking and book_tickets write it, after checking every value against the database."""
@@ -32,7 +34,7 @@ class ChatContext:
     """Set by the service for each turn, never by the model: whose conversation it is and the time."""
 
     session_id: str
-    owner: str
+    caller: Caller  # the tools call the booking API as this person, with their own credentials
     now: datetime
 
 

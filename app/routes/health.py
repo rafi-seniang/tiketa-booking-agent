@@ -1,4 +1,4 @@
-"""Liveness touches nothing (the lobby polls it). /meta describes the service for the lab frontend."""
+"""Liveness touches nothing (the web app polls it to show the chat On or Off). /meta describes the service."""
 
 from typing import Annotated
 
@@ -20,9 +20,9 @@ async def health() -> dict[str, str]:
 @router.get("/meta")
 async def meta(resources: Annotated[Resources, Depends(get_resources)]) -> ServiceMeta:
     return ServiceMeta(
-        id="tiketa",
-        name="Tiketa",
-        summary="A cinema booking assistant: finds showtimes, picks seats, and books only after the user confirms.",
+        id="tiketa-agent",
+        name="Tiketa booking agent",
+        summary="A chat agent for Tiketa: finds showtimes, picks seats, and books through the booking API after a yes.",
         version=VERSION,
         engine=resources.model_name,
         own_ui_path="/docs",

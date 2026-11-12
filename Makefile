@@ -1,7 +1,7 @@
 # On Windows use Git Bash, or run the commands below by hand.
 PY ?= python
 
-.PHONY: install up migrate seed dev test lint typecheck check scenarios
+.PHONY: install up database migrate dev test lint typecheck check scenarios
 
 install:            ## create the venv and install with dev tools
 	$(PY) -m venv .venv && .venv/bin/pip install -e ".[dev]" || .venv/Scripts/pip install -e ".[dev]"
@@ -9,13 +9,13 @@ install:            ## create the venv and install with dev tools
 up:                 ## Postgres, Redis and Phoenix
 	docker compose up -d
 
+database:           ## once, on a Postgres volume from before the split: add the agent's own database
+	docker exec tiketa-postgres createdb -U tiketa tiketa_agent
+
 migrate:            ## bring the database schema up to date (the service refuses an older one)
 	alembic upgrade head
 
-seed:               ## sample films and a week of showtimes
-	PYTHONPATH=. python scripts/seed.py --days 7
-
-dev:                ## run with reload
+dev:                ## run with reload (the booking service, tiketa-app, must be up)
 	python main.py
 
 test:

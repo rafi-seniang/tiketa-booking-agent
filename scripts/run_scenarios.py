@@ -3,6 +3,8 @@
 Checks in code: the events a turn must or must not produce, and the bookings each conversation ends with.
 The judge (JUDGE_MODEL) reads each reply against the expected behaviour. Check it against your own reading first.
 
+The agent books through the booking API (tiketa-app), which must be running with this week published.
+
 Usage: python scripts/run_scenarios.py [--url http://127.0.0.1:8060] [--key KEY] [--only NAME] [--no-judge]
 """
 
@@ -58,7 +60,9 @@ def reply_of(events: list[dict[str, Any]]) -> str:
     return "\n".join(texts) + shown
 
 
-async def play(client: httpx.AsyncClient, scenario: Scenario, judge: Any) -> list[dict[str, Any]]:
+async def play(
+    client: httpx.AsyncClient, scenario: Scenario, judge: Any, cinema_timezone: ZoneInfo
+) -> list[dict[str, Any]]:
     session_id = (await client.post("/v1/sessions")).json()["session_id"]
     history: list[str] = []
     rows: list[dict[str, Any]] = []
@@ -89,7 +93,7 @@ async def play(client: httpx.AsyncClient, scenario: Scenario, judge: Any) -> lis
             "usage": events[-1].get("data") if events else None,
         }
         if judge is not None:
-            now_local = local_text(datetime.now(UTC), ZoneInfo(get_settings().cinema_timezone))
+            now_local = local_text(datetime.now(UTC), cinema_timezone)
             prompt = JUDGE_PROMPT.format(now_local=now_local, events=", ".join(types) or "none", expected=turn.expect)
             conversation = "\n".join([*history, f"USER: {user}", f"ASSISTANT: {reply}"])
             verdict = await judge.ainvoke([SystemMessage(prompt), HumanMessage(conversation)])
@@ -105,9 +109,12 @@ async def play(client: httpx.AsyncClient, scenario: Scenario, judge: Any) -> lis
 async def play_all(scenarios: list[Scenario], url: str, key: str, judge: Any) -> list[dict[str, Any]]:
     headers = {"X-API-Key": key} if key else {}
     rows: list[dict[str, Any]] = []
+    async with httpx.AsyncClient(base_url=get_settings().booking_api_url, headers=headers, timeout=10) as booking_api:
+        cinema = (await booking_api.get("/v1/cinema")).raise_for_status().json()
+    cinema_timezone = ZoneInfo(cinema["timezone"])  # the judge reads "besok" from the cinema's clock
     async with httpx.AsyncClient(base_url=url, headers=headers, timeout=300) as client:
         for scenario in scenarios:  # one at a time keeps provider rate limits simple
-            rows += await play(client, scenario, judge)
+            rows += await play(client, scenario, judge, cinema_timezone)
     return rows
 
 

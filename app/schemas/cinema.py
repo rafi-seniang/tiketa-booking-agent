@@ -1,19 +1,10 @@
-"""What the cinema hands out and takes in. Seat ids are checked here, once, where they enter."""
+"""What the booking API (tiketa-app) answers and takes. That service owns these shapes: the agent only reads them."""
 
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field
-
-from app.utils.seat_layout import AISLE_AFTER_SEAT, ALL_SEAT_IDS, WALKWAY_BEFORE_ROW
-
-
-def known_seat_id(seat_id: str) -> str:
-    if seat_id not in ALL_SEAT_IDS:
-        raise ValueError(
-            f"{seat_id!r} is not a seat in this studio. Seat ids look like D7: a row letter, then a number"
-        )
-    return seat_id
 
 
 def no_repeated_seats(seat_ids: list[str]) -> list[str]:
@@ -22,9 +13,17 @@ def no_repeated_seats(seat_ids: list[str]) -> list[str]:
     return seat_ids
 
 
-SeatId = Annotated[str, AfterValidator(known_seat_id)]
-SeatIds = Annotated[list[SeatId], Field(min_length=1), AfterValidator(no_repeated_seats)]
+# Which ids are seats is the booking API's knowledge: the tools check them against its seat map
+SeatIds = Annotated[list[str], Field(min_length=1), AfterValidator(no_repeated_seats)]
 CustomerName = Annotated[str, Field(min_length=1, max_length=80)]
+
+
+@dataclass(frozen=True)
+class Caller:
+    """Who a request is from, as the booking API names them, and the credentials they sent, to pass on as theirs."""
+
+    name: str
+    credentials: dict[str, str] = field(repr=False)  # an API key header or the guest cookie: never logged
 
 
 class Movie(BaseModel):
@@ -34,8 +33,6 @@ class Movie(BaseModel):
     release_year: int
     genres: list[str]
     studio_number: int
-    poster_url: str | None
-    trailer_youtube_id: str | None
 
 
 class Showtime(BaseModel):
@@ -44,31 +41,19 @@ class Showtime(BaseModel):
     movie_title: str
     studio_number: int
     starts_at: datetime
+    starts_at_local: str
     price_idr: int
     seats_left: int
 
 
-Channel = Literal["chat", "web"]
-
-
 class Booking(BaseModel):
     code: str
-    channel: Channel
+    channel: Literal["web", "chat", "mcp"]
     showtime: Showtime
     seats: list[str]
     customer_name: str
     total_price_idr: int
     created_at: datetime
-
-
-class BookingRequest(BaseModel):
-    idempotency_key: str
-    owner: str
-    channel: Channel
-    session_id: str | None = None
-    showtime_id: int
-    seats: SeatIds
-    customer_name: CustomerName
 
 
 class SeatView(BaseModel):
@@ -82,17 +67,30 @@ class SeatRowView(BaseModel):
 
 
 class SeatMap(BaseModel):
-    """For a UI: rows front to back, and where the aisle and the walkway fall, so a UI draws the real room."""
-
     showtime: Showtime
     rows: list[SeatRowView]
-    aisle_after_seat: int = AISLE_AFTER_SEAT
-    walkway_before_row: str = WALKWAY_BEFORE_ROW
+    aisle_after_seat: int
+    walkway_before_row: str
 
 
-class BookingForm(BaseModel):
-    """What the booking form sends. The owner and channel come from the server."""
+class Week(BaseModel):
+    days: list[date]
+    today: date
+    is_published: bool
+
+
+class Cinema(BaseModel):
+    name: str
+    timezone: str
+    max_seats_per_booking: int
+    week: Week
+
+
+class BookingOrder(BaseModel):
+    """What the agent sends to book, once the user has said yes."""
 
     showtime_id: int
     seats: SeatIds
     customer_name: CustomerName
+    channel: Literal["chat"] = "chat"
+    session_id: str

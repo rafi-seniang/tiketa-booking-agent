@@ -1,7 +1,8 @@
-# What the service needs locally: Postgres (cinema data and conversation checkpoints), Redis (rate limit and turn
-# lock) and Phoenix (traces). The service runs on the host: `docker compose up -d`, `python scripts/seed.py`,
-# then `python main.py`. Ports sit next to the other Lab backends' (Redis 6379 to 6382 are taken) and listen
-# on 127.0.0.1 only.
+# What the agent needs locally: Postgres (who owns each conversation, and the conversation checkpoints), Redis
+# (rate limit, turn lock, token budget) and Phoenix (traces). The booking service is its own repository
+# (tiketa-app, on ports 8070, 5434 and 6384) and must be running first.
+# The agent runs on the host: `docker compose up -d`, `alembic upgrade head`, then `python main.py`.
+# Ports listen on 127.0.0.1 only.
 services:
   postgres:
     image: postgres:17.11-alpine
@@ -9,11 +10,13 @@ services:
     environment:
       POSTGRES_USER: tiketa
       POSTGRES_PASSWORD: tiketa-local
-      POSTGRES_DB: tiketa
+      # Made on a new volume only. On a volume from before the split, where the database is still `tiketa`,
+      # run `make database` once: it adds this one and leaves the old one as it is
+      POSTGRES_DB: tiketa_agent
     ports: ["127.0.0.1:5433:5432"]
     volumes: ["tiketa-postgres:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tiketa -d tiketa"]
+      test: ["CMD-SHELL", "pg_isready -U tiketa"]
       interval: 5s
       retries: 20
 
@@ -21,7 +24,7 @@ services:
     image: redis:7.4-alpine
     container_name: tiketa-redis
     ports: ["127.0.0.1:6383:6379"]
-    # Locks and rate counters all expire, so only keys with a timeout may be evicted
+    # Locks and counters all expire, so only keys with a timeout may be evicted
     command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "volatile-lru"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -34,7 +37,7 @@ services:
     ports: ["127.0.0.1:6006:6006"]
     # Traces are kept in the same Postgres, in their own schema, so they survive a restart without a volume
     environment:
-      PHOENIX_SQL_DATABASE_URL: postgresql://tiketa:tiketa-local@postgres:5432/tiketa
+      PHOENIX_SQL_DATABASE_URL: postgresql://tiketa:tiketa-local@postgres:5432/tiketa_agent
       PHOENIX_SQL_DATABASE_SCHEMA: phoenix
       # Phoenix asks for a login when it listens beyond loopback, as it does in a container. The port is
       # published on 127.0.0.1 only, so local traces need none. Turn it on before exposing Phoenix anywhere
