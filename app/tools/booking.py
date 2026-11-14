@@ -178,7 +178,10 @@ def build_tools(api: BookingApi, max_seats: int) -> list[BaseTool]:
             if answer.user_message:
                 outcome = "The user wrote a reply instead of confirming, so nothing was booked. Act on their message."
             else:
-                outcome = "The user pressed Cancel on the summary, so nothing was booked. Tell them it is cancelled."
+                outcome = (
+                    "The user pressed Cancel on the summary, so nothing was booked. No seat is held or set aside "
+                    "for them: seats stay free for anyone until a booking is made. Tell them it is cancelled."
+                )
             declined = ToolMessage(outcome, tool_call_id=runtime.tool_call_id)
             return Command(update={"messages": [declined, *typed_reply]})
         if runtime.tool_call_id is None:
