@@ -8,6 +8,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 from litellm.exceptions import MidStreamFallbackError
 
+from app.core.errors import RateLimited
 from app.schemas.agent import ChatContext
 from app.schemas.cinema import Showtime
 from app.services.booking_agent import build_agent
@@ -105,6 +106,24 @@ async def test_a_taken_seat_goes_back_to_the_model_and_changes_nothing(
     refusal = (await tool_messages(agent))[-1]
     assert refusal.status == "error" and "Already taken: D9" in refusal.text
     assert (await agent.aget_state(CONFIG)).values.get("draft", {}) == {}
+
+
+async def test_a_rate_limit_at_the_booking_service_goes_back_to_the_model_with_the_wait(
+    agent: Agent,
+    model: ScriptedChatModel,
+    api: FakeBookingApi,
+    dune_today: list[Showtime],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def over_the_limit(showtime_id: int, caller: Any) -> Showtime:
+        raise RateLimited("Over 60 requests a minute.", 20)
+
+    monkeypatch.setattr(api, "get_showtime", over_the_limit)
+    model.replies += [calls(choose(dune_today[2], ["D9"])), says("Sebentar ya, coba lagi 20 detik lagi.")]
+    reply = await ask(agent, "dune jam 6, D9")
+    refusal = (await tool_messages(agent))[-1]
+    assert refusal.status == "error" and "try again in 20 seconds" in refusal.text
+    assert reply["messages"][-1].text == "Sebentar ya, coba lagi 20 detik lagi."
 
 
 async def test_a_seat_the_booking_service_does_not_know_is_refused(

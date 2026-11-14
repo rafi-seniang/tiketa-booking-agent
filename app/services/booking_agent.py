@@ -22,7 +22,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
-from app.core.errors import Conflict, NotFound
+from app.core.errors import Conflict, NotFound, RateLimited
 from app.engines.llm import STREAM_DROPPED_ERRORS
 from app.generative.prompts import system_prompt, turn_context
 from app.repositories.booking_api import BookingApi
@@ -41,6 +41,9 @@ async def report_refusals(
         return await handler(request)
     except (NotFound, Conflict) as refusal:
         return ToolMessage(f"Not done: {refusal.detail}", tool_call_id=request.tool_call["id"], status="error")
+    except RateLimited as refusal:  # the booking service's own limit for this person, which passes by waiting
+        wait = f"the booking service is busy. Ask the user to try again in {refusal.retry_after_seconds} seconds."
+        return ToolMessage(f"Not done: {wait}", tool_call_id=request.tool_call["id"], status="error")
 
 
 def build_agent(
