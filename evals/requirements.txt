@@ -1,4 +1,4 @@
 # The evaluation environment (make evals-install), apart from the service's: DeepEval 4.3 needs click below 8.4
 # and the agent's model stack needs 8.4.2 or newer. Pinned like the model stack, taken once 14 days old.
 deepeval==4.3.2
-pywin32>=311; sys_platform == "win32"  # DeepEval's file locks on Windows
+pywin32>=312; sys_platform == "win32"  # DeepEval's file locks on Windows
