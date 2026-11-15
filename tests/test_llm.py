@@ -23,3 +23,21 @@ def test_with_a_gateway_every_call_goes_through_it_and_streaming_turns_off_by_it
     assert model.model == "openai/small" and model.api_base == "http://127.0.0.1:8020/v1"
     assert model.disable_streaming is True
     assert model.model_kwargs == {}  # thinking is off behind a gateway
+
+
+def test_gemini_configures_primary_and_backup_keys(settings: Settings) -> None:
+    three_keys = settings.model_copy(
+        update={
+            "llm_model": "gemini/gemini-3-flash-preview",
+            "gemini_api_key": SecretStr("gem-key-1"),
+            "gemini_api_key_2": SecretStr("gem-key-2"),
+            "gemini_api_key_3": SecretStr("gem-key-3"),
+        }
+    )
+    model = build_agent_model(three_keys)
+    assert model.model == "gemini/gemini-3-flash-preview"
+    assert model.api_key == "gem-key-1"
+    assert model.model_kwargs["fallbacks"] == [
+        {"model": "gemini/gemini-3-flash-preview", "api_key": "gem-key-2"},
+        {"model": "gemini/gemini-3-flash-preview", "api_key": "gem-key-3"},
+    ]
