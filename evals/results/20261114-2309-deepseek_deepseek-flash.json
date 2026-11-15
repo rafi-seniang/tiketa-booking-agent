@@ -1,0 +1,245 @@
+{
+ "played_at_local": "Sunday 15 November 2026, 06:09 WIB",
+ "agent_model": "deepseek/deepseek-flash",
+ "reasoning_effort": "low",
+ "available_tools": [
+  {
+   "name": "find_showtimes",
+   "description": "Showtimes on one day that have not started yet, with price per seat and seats left.",
+   "parameters": {
+    "properties": {
+     "day": {
+      "description": "The day, in cinema time, as YYYY-MM-DD",
+      "format": "date",
+      "type": "string"
+     },
+     "movie_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "Only this film. Leave it out for every film"
+     }
+    },
+    "required": [
+     "day"
+    ],
+    "type": "object"
+   }
+  },
+  {
+   "name": "get_movie_details",
+   "description": "A film's synopsis, year, genres and studio.",
+   "parameters": {
+    "properties": {
+     "movie_id": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "movie_id"
+    ],
+    "type": "object"
+   }
+  },
+  {
+   "name": "get_seat_map",
+   "description": "The seat map of a showtime, with the seats already taken. Read it before choosing seats.",
+   "parameters": {
+    "properties": {
+     "showtime_id": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "showtime_id"
+    ],
+    "type": "object"
+   }
+  },
+  {
+   "name": "update_booking",
+   "description": "Sets the showtime, the seats and the name of the booking. Pass only what changes.",
+   "parameters": {
+    "properties": {
+     "showtime_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "The chosen showtime, from find_showtimes"
+     },
+     "seats": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "Every seat of the booking, ids as in the seat map"
+     },
+     "customer_name": {
+      "anyOf": [
+       {
+        "maxLength": 80,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "description": "The name the booking is under"
+     }
+    },
+    "type": "object"
+   }
+  },
+  {
+   "name": "book_tickets",
+   "description": "Asks the user to confirm the booking in progress, then books it. Call it alone, once nothing is missing.",
+   "parameters": {
+    "properties": {},
+    "type": "object"
+   }
+  },
+  {
+   "name": "list_my_bookings",
+   "description": "The bookings made in this conversation.",
+   "parameters": {
+    "properties": {},
+    "type": "object"
+   }
+  }
+ ],
+ "turns": [
+  {
+   "scenario": "English, then Cancel",
+   "turn": 1,
+   "user": "Hi, two tickets for Parasite tomorrow afternoon please, under the name Alex",
+   "reply": "Sure! Parasite has two afternoon shows tomorrow, Monday 16 November: 13:00 and 15:45, both in studio 18 at 45,000 rupiah per seat. Which one would you like?",
+   "events": [
+    "tool",
+    "message",
+    "end"
+   ],
+   "tools": [
+    {
+     "name": "find_showtimes",
+     "arguments": {
+      "day": "2026-11-16",
+      "movie_id": 18
+     },
+     "output": "[{\"showtime_id\": 657, \"film\": \"Parasite\", \"movie_id\": 18, \"starts\": \"Monday 16 November 2026, 13:00 WIB\", \"studio\": 18, \"price_idr\": 45000, \"seats_left\": 216}, {\"showtime_id\": 658, \"film\": \"Parasite\", \"movie_id\": 18, \"starts\": \"Monday 16 November 2026, 15:45 WIB\", \"studio\": 18, \"price_idr\": 45000, \"seats_left\": 216}, {\"showtime_id\": 659, \"film\": \"Parasite\", \"movie_id\": 18, \"starts\": \"Monday 16 November 2026, 18:30 WIB\", \"studio\": 18, \"price_idr\": 45000, \"seats_left\": 216}, {\"showtime_id\": 660, \"film\": \"Parasite\", \"movie_id\": 18, \"starts\": \"Monday 16 November 2026, 21:15 WIB\", \"studio\": 18, \"price_idr\": 45000, \"seats_left\": 216}]"
+    }
+   ],
+   "token_events": 47,
+   "checks": [],
+   "seconds": 2.7,
+   "usage": {
+    "model_calls": 2,
+    "input_tokens": 3601,
+    "cached_input_tokens": 2944,
+    "output_tokens": 217
+   },
+   "verdict": "pass",
+   "reasoning": "The reply is in English, offers tomorrow afternoon's Parasite showtimes (13:00 and 15:45), and asks which show the user wants without booking anything. It matches the expected behaviour."
+  },
+  {
+   "scenario": "English, then Cancel",
+   "turn": 2,
+   "user": "the earliest afternoon one, any two seats together in row G",
+   "reply": "\n[summary shown to the user: {\"showtime_id\": 657, \"movie_title\": \"Parasite\", \"starts_at\": \"2026-11-16T06:00:00Z\", \"starts_at_local\": \"Monday 16 November 2026, 13:00 WIB\", \"studio_number\": 18, \"seats\": [\"G8\", \"G9\"], \"customer_name\": \"Alex\", \"price_per_seat_idr\": 45000, \"total_price_idr\": 90000}]",
+   "events": [
+    "tool",
+    "tool",
+    "tool",
+    "confirmation",
+    "end"
+   ],
+   "tools": [
+    {
+     "name": "get_seat_map",
+     "arguments": {
+      "showtime_id": 657
+     },
+     "output": "Parasite, Monday 16 November 2026, 13:00 WIB, studio 18, 45000 IDR per seat\n-- is a taken seat and | the only aisle, between seats 9 and 10. Seats 1 and 18 are against the walls. Seats are next to each other when they share a row and have consecutive numbers on the same side of the aisle. The centre of the hall is rows E to H, seats 6 to 13.\nSCREEN (front)\nA1 A2 A3 A4 A5 A6 A7 A8 A9 | A10 A11 A12 A13 A14 A15 A16 A17 A18\nB1 B2 B3 B4 B5 B6 B7 B8 B9 | B10 B11 B12 B13 B14 B15 B16 B17 B18\nC1 C2 C3 C4 C5 C6 C7 C8 C9 | C10 C11 C12 C13 C14 C15 C16 C17 C18\nD1 D2 D3 D4 D5 D6 D7 D8 D9 | D10 D11 D12 D13 D14 D15 D16 D17 D18\nE1 E2 E3 E4 E5 E6 E7 E8 E9 | E10 E11 E12 E13 E14 E15 E16 E17 E18\nF1 F2 F3 F4 F5 F6 F7 F8 F9 | F10 F11 F12 F13 F14 F15 F16 F17 F18\nG1 G2 G3 G4 G5 G6 G7 G8 G9 | G10 G11 G12 G13 G14 G15 G16 G17 G18\nH1 H2 H3 H4 H5 H6 H7 H8 H9 | H10 H11 H12 H13 H14 H15 H16 H17 H18\nI1 I2 I3 I4 I5 I6 I7 I8 I9 | I10 I11 I12 I13 I14 I15 I16 I17 I18\nJ1 J2 J3 J4 J5 J6 J7 J8 J9 | J10 J11 J12 J13 J14 J15 J16 J17 J18\n(walkway)\nL1 L2 L3 L4 L5 L6 L7 L8 L9 | L10 L11 L12 L13 L14 L15 L16 L17 L18\nM1 M2 M3 M4 M5 M6 M7 M8 M9 | M10 M11 M12 M13 M14 M15 M16 M17 M18\nBACK"
+    },
+    {
+     "name": "update_booking",
+     "arguments": {
+      "showtime_id": 657,
+      "seats": [
+       "G8",
+       "G9"
+      ],
+      "customer_name": "Alex"
+     },
+     "output": "Showtime: Parasite, Monday 16 November 2026, 13:00 WIB, studio 18, 45000 IDR per seat\nSeats: G8, G9\nName: Alex\nReady: call book_tickets when the user wants to book"
+    },
+    {
+     "name": "book_tickets",
+     "arguments": {},
+     "output": "Paused: the summary is shown to the user and waits for Confirm or Cancel."
+    }
+   ],
+   "token_events": 0,
+   "checks": [],
+   "seconds": 4.3,
+   "usage": {
+    "model_calls": 3,
+    "input_tokens": 8137,
+    "cached_input_tokens": 6656,
+    "output_tokens": 455
+   },
+   "verdict": "pass",
+   "reasoning": "The assistant replied in English, selected the earliest afternoon show (13:00), picked two adjacent free seats in row G (G8, G9), and presented a summary asking for confirmation without claiming a booking code."
+  },
+  {
+   "scenario": "English, then Cancel",
+   "turn": 3,
+   "user": "[pressed cancel]",
+   "reply": "No problem — the booking was cancelled and nothing was booked. Seats G8 and G9 for Parasite tomorrow at 13:00 stay free for anyone. If you'd like, I can try again or pick different seats.",
+   "events": [
+    "message",
+    "end"
+   ],
+   "tools": [
+    {
+     "name": "book_tickets",
+     "arguments": {},
+     "output": "The user pressed Cancel on the summary, so nothing was booked. No seat is held or set aside for them: seats stay free for anyone until a booking is made. Tell them it is cancelled."
+    }
+   ],
+   "token_events": 47,
+   "checks": [],
+   "seconds": 1.0,
+   "usage": {
+    "model_calls": 1,
+    "input_tokens": 3316,
+    "cached_input_tokens": 2944,
+    "output_tokens": 48
+   },
+   "verdict": "pass",
+   "reasoning": "The reply is in English, matches the user's language, and correctly states that nothing was booked after the user cancelled, without claiming a booking code."
+  }
+ ]
+}

@@ -41,6 +41,8 @@ seats exist and are free, what they cost, whether the showtime has started, and 
 | Cost of long conversations | The fixed text comes first, so DeepSeek reads 80% of input tokens from its prompt cache |
 | No invented ids, prices or seats | Tools check every value with the booking service. The draft only changes through `update_booking` |
 | Booking only after a yes | `interrupt()` inside `book_tickets`, resumed by `POST .../confirmation` or a typed reply the reader model classifies |
+| Words with the summary | A model that calls a tool often writes nothing beside the call. The sentence the user reads with the summary is a required argument of `book_tickets`, sent as a `message` event before the `confirmation` |
+| The booking service says slow down | Its rate limit reaches the model as "try again in N seconds", not as a failed turn |
 | The agent cannot do more than the user | Every call to the booking service carries the user's own credentials. The agent holds no key that can book |
 | A seat sold once, a retry booking once | The booking service's unique constraint, and one idempotency key per tool call of a conversation |
 | Who is calling | The booking service says. The agent keeps no API keys and signs no sessions |
@@ -57,18 +59,25 @@ Decisions: [docs/adr/0001-architecture.md](docs/adr/0001-architecture.md) (the a
 
 ## Measured
 
-Scripted conversations against the running service with real DeepSeek calls, checked in code (events, bookings) and
-by `deepseek-v4-pro` as judge. Details and what each run found: [evals/README.md](evals/README.md). These numbers are
-from v0.1.0, on 8 November 2026. The split changed where the tools read from, not the prompt or the loop, and the
-scenarios have not been rerun since.
+Thirteen scripted conversations (25 turns, Indonesian and English) against the running service and the booking
+service, with real DeepSeek calls. Each turn is checked in code (the events it must and must not produce, the
+bookings it ends with) and by `deepseek-v4-pro` as judge. The transcripts, with every tool call, are then graded with
+[DeepEval](https://deepeval.com): per-turn conditions, tool use, role adherence and a G-Eval for the reply language.
+Details, every run and what each found: [evals/README.md](evals/README.md).
 
-| Thinking | Code checks | Judge | Median turn |
-|---|---|---|---|
-| off | 17/17 | 16/17 | 2.0 s |
-| `low` (default) | 17/17 | 17/17 | 2.6 s |
+| 15 November 2026, after the split | Code checks | Judge | Median turn | Slowest |
+|---|---|---|---|---|
+| First run | 25/25 | 24/25 | 2.5 s | 6.2 s |
+| Last run, after three fixes | 25/25 | 25/25 | 2.2 s | 5.1 s |
 
-Thinking was the difference on seats described in words: "three seats in the back row by the aisle" came out right 3
-of 3 times with it and 1 of 3 without.
+The live runs found three things no unit test had: a rate limit at the booking service failed a whole turn, after
+Cancel the agent once said seats were "still set aside", and the agent wrote no sentence with any of ten summaries.
+All three are fixed. DeepEval graded three transcripts in full (8 to 10 of 13 conversations passing every check,
+112 of 114 conditions) and the last one only in part, because the DeepSeek balance ran low. Its pass rate after the
+last fix is therefore not known yet.
+
+On 8 November (v0.1.0, 17 turns) thinking was the difference on seats described in words: "three seats in the back
+row by the aisle" came out right 3 of 3 times with it and 1 of 3 without.
 
 ## Run
 
@@ -91,8 +100,9 @@ because psycopg's async mode needs a selector event loop.
 
 Switch to Gemini with `LLM_MODEL=gemini/gemini-3.8-flash` (reads `GEMINI_API_KEY`). It is configured, not yet run live.
 
-    make check        # ruff, mypy strict, 44 tests with a scripted model and an in-memory booking service
-    make scenarios    # the evaluation above, about 85k agent tokens
+    make check        # ruff, mypy strict, 45 tests with a scripted model and an in-memory booking service
+    make scenarios    # plays the conversations above, about 150k agent tokens, most of them read from the cache
+    make evals        # grades the newest transcript with DeepEval (make evals-install once)
 
 ## API
 
@@ -128,6 +138,6 @@ cookie the booking service set, and asks that service who it is.
     app/schemas/                Pydantic models for the API, the agent's state and the booking service's answers
     app/utils/                  pure helpers: the cinema clock, the seat map as text
     scripts/                    run_scenarios.py
-    evals/                      scenarios, results, what they found
+    evals/                      scenarios, transcripts, the DeepEval grading, what they found
     migrations/                 Alembic: 0001 and 0002 from the all-in-one service, 0003 the cinema tables leave
     tests/                      the real graph with a scripted model, the HTTP client, the API, the migrations
