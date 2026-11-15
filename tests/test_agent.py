@@ -8,13 +8,14 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 from litellm.exceptions import MidStreamFallbackError
 
+from app.core.errors import RateLimited
 from app.schemas.agent import ChatContext
 from app.schemas.cinema import Showtime
 from app.services.booking_agent import build_agent
 from app.settings import Settings
 
 from conftest import CALLER, NOW
-from fakes import FakeBookingApi, ScriptedChatModel, calls, says
+from fakes import BOOK, FakeBookingApi, ScriptedChatModel, calls, says
 
 Agent = CompiledStateGraph[Any, Any, Any, Any]
 CONFIG: Any = {"configurable": {"thread_id": "s1"}}
@@ -41,7 +42,7 @@ async def test_a_booking_waits_for_the_user_then_books_what_was_shown(
     agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
 ) -> None:
     evening = dune_today[2]
-    model.replies += [calls(choose(evening, ["D9", "D10"])), calls(("book_tickets", {})), says("Sudah dipesan.")]
+    model.replies += [calls(choose(evening, ["D9", "D10"])), calls(BOOK), says("Sudah dipesan.")]
     await ask(agent, "dune jam 6 sore, 2 kursi tengah, atas nama Rafi")
 
     waiting = (await agent.aget_state(CONFIG)).interrupts
@@ -65,7 +66,7 @@ async def test_every_call_to_the_booking_service_is_made_as_the_person_in_the_co
     model.replies += [
         calls(("find_showtimes", {"day": today})),
         calls(choose(dune_today[2], ["A1"])),
-        calls(("book_tickets", {})),
+        calls(BOOK),
         says("Sudah dipesan."),
     ]
     await ask(agent, "dune jam 6, A1, Rafi")
@@ -77,7 +78,7 @@ async def test_every_call_to_the_booking_service_is_made_as_the_person_in_the_co
 async def test_cancel_books_nothing(
     agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["A1"])), calls(("book_tickets", {})), says("Oke, dibatalkan.")]
+    model.replies += [calls(choose(dune_today[2], ["A1"])), calls(BOOK), says("Oke, dibatalkan.")]
     await ask(agent, "dune jam 6, A1, Rafi")
     await agent.ainvoke(Command(resume={"approved": False}), CONFIG, context=CONTEXT)
     assert await api.bookings_of_session("s1", CALLER) == []
@@ -87,7 +88,7 @@ async def test_cancel_books_nothing(
 async def test_a_typed_reply_to_the_confirmation_joins_the_conversation(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["A1"])), calls(("book_tickets", {})), says("Mau ganti ke mana?")]
+    model.replies += [calls(choose(dune_today[2], ["A1"])), calls(BOOK), says("Mau ganti ke mana?")]
     await ask(agent, "dune jam 6, A1, Rafi")
     await agent.ainvoke(Command(resume={"approved": False, "user_message": "ganti D5 aja"}), CONFIG, context=CONTEXT)
     tool_result, typed_reply = model.received[-1][-3:-1]  # the turn context comes last
@@ -107,6 +108,24 @@ async def test_a_taken_seat_goes_back_to_the_model_and_changes_nothing(
     assert (await agent.aget_state(CONFIG)).values.get("draft", {}) == {}
 
 
+async def test_a_rate_limit_at_the_booking_service_goes_back_to_the_model_with_the_wait(
+    agent: Agent,
+    model: ScriptedChatModel,
+    api: FakeBookingApi,
+    dune_today: list[Showtime],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def over_the_limit(showtime_id: int, caller: Any) -> Showtime:
+        raise RateLimited("Over 60 requests a minute.", 20)
+
+    monkeypatch.setattr(api, "get_showtime", over_the_limit)
+    model.replies += [calls(choose(dune_today[2], ["D9"])), says("Sebentar ya, coba lagi 20 detik lagi.")]
+    reply = await ask(agent, "dune jam 6, D9")
+    refusal = (await tool_messages(agent))[-1]
+    assert refusal.status == "error" and "try again in 20 seconds" in refusal.text
+    assert reply["messages"][-1].text == "Sebentar ya, coba lagi 20 detik lagi."
+
+
 async def test_a_seat_the_booking_service_does_not_know_is_refused(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
@@ -120,7 +139,7 @@ async def test_a_seat_the_booking_service_does_not_know_is_refused(
 async def test_book_tickets_refuses_a_booking_with_something_missing(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["A1"], name=None)), calls(("book_tickets", {})), says("Atas nama?")]
+    model.replies += [calls(choose(dune_today[2], ["A1"], name=None)), calls(BOOK), says("Atas nama?")]
     await ask(agent, "dune jam 6 kursi A1")
     assert not (await agent.aget_state(CONFIG)).interrupts
     assert "Still needed: name on the booking" in (await tool_messages(agent))[-1].text
@@ -129,7 +148,7 @@ async def test_book_tickets_refuses_a_booking_with_something_missing(
 async def test_book_tickets_must_be_called_on_its_own(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["A1"]), ("book_tickets", {})), says("Sebentar.")]
+    model.replies += [calls(choose(dune_today[2], ["A1"]), BOOK), says("Sebentar.")]
     await ask(agent, "dune jam 6 kursi A1 atas nama Rafi, langsung pesan")
     assert not (await agent.aget_state(CONFIG)).interrupts
     assert any("on its own" in message.text for message in await tool_messages(agent))
@@ -139,7 +158,7 @@ async def test_a_seat_sold_while_the_user_decides_is_not_booked_twice(
     agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
 ) -> None:
     evening = dune_today[2]
-    model.replies += [calls(choose(evening, ["D9"])), calls(("book_tickets", {})), says("Maaf, D9 baru saja terisi.")]
+    model.replies += [calls(choose(evening, ["D9"])), calls(BOOK), says("Maaf, D9 baru saja terisi.")]
     await ask(agent, "dune jam 6, D9, Rafi")
     await api.someone_else_books(evening, ["D9"])
     await agent.ainvoke(Command(resume={"approved": True}), CONFIG, context=CONTEXT)

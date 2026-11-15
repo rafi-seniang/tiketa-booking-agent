@@ -10,12 +10,14 @@ from app.schemas.cinema import Showtime
 from app.services.chat import ChatService
 
 from conftest import OWNER, FakeReader, parse_events
-from fakes import FakeBookingApi, ScriptedChatModel, calls, says
+from fakes import BOOK, FakeBookingApi, ScriptedChatModel, calls, says
+
+SENTENCE = BOOK[1]["message_to_user"]
 
 
 def booking_replies(showtime: Showtime) -> list[Any]:
     choose = ("update_booking", {"showtime_id": showtime.id, "seats": ["D9", "D10"], "customer_name": "Rafi"})
-    return [calls(choose), calls(("book_tickets", {}))]
+    return [calls(choose), calls(BOOK)]
 
 
 async def start(client: httpx.AsyncClient) -> str:
@@ -38,8 +40,9 @@ async def test_a_conversation_books_only_after_confirm(
     session_id = await start(client)
 
     events = await send(client, session_id, "dune jam 6 sore, 2 kursi tengah, atas nama Rafi")
-    assert [event["type"] for event in events] == ["tool", "tool", "confirmation", "end"]
-    assert events[2]["data"]["seats"] == ["D9", "D10"]
+    assert [event["type"] for event in events] == ["tool", "tool", "message", "confirmation", "end"]
+    assert events[2]["text"] == SENTENCE  # the agent's words arrive with the summary, though it only called a tool
+    assert events[3]["data"]["seats"] == ["D9", "D10"]
     assert events[-1]["data"]["model_calls"] == 2
     view = (await client.get(f"/v1/sessions/{session_id}")).json()
     assert view["pending_confirmation"]["total_price_idr"] == 2 * dune_today[2].price_idr
@@ -51,7 +54,7 @@ async def test_a_conversation_books_only_after_confirm(
     view = (await client.get(f"/v1/sessions/{session_id}")).json()
     assert view["pending_confirmation"] is None
     assert view["bookings"][0]["code"] == events[0]["data"]["code"]
-    assert [turn["role"] for turn in view["turns"]] == ["user", "assistant"]
+    assert [turn["role"] for turn in view["turns"]] == ["user", "assistant", "assistant"]
 
 
 async def test_a_booking_in_the_chat_belongs_to_the_caller_the_booking_service_named(
@@ -78,6 +81,7 @@ async def test_a_typed_yes_while_a_booking_waits_is_read_by_the_model(
     view = (await client.get(f"/v1/sessions/{session_id}")).json()
     assert [turn["text"] for turn in view["turns"]] == [
         "dune jam 6 sore, 2 kursi tengah, atas nama Rafi",
+        SENTENCE,
         "iya gas",
         "Siap, sudah dipesan.",
     ]
