@@ -57,11 +57,18 @@ Telemetry is off (`DEEPEVAL_TELEMETRY_OPT_OUT=1`) and nothing is sent to Confide
 | `2026-11-15-second-run` | `20261114-2314` | 10 of 13 | 38 of 38 | 10 of 10 (0.91) | 13 of 13 (0.94) | 10 of 13 (0.73) |
 | `2026-11-15-third-run` | `20261114-2323` | 8 of 13 | 36 of 38 | 10 of 10 (0.90) | 10 of 12, one not scored (0.70) | 12 of 13 (0.92) |
 | `2026-11-15-fourth-run` | `20261114-2334` | 2 of the 2 graded | 7 of 7 | 2 of 2 | 2 of 2 | 2 of 2 |
+| `2026-11-15-fifth-run` | `20261114-2334` | **12 of 13** | **38 of 38** | 10 of 10 (0.95) | 12 of 13 (0.92) | 13 of 13 (0.99) |
 
-**The fourth grading is incomplete.** DeepSeek answered 429 for 11 of the 13 conversations: it lowers an account's
-allowed concurrency as the balance falls, and the balance was at 0.20 USD. So the effect of the last agent change on
-DeepEval's scores is measured on two conversations only. Run `make evals` again after a top-up before quoting a
-DeepEval pass rate.
+The fourth grading stopped early. DeepSeek answered 429 for 11 of the 13 conversations: it lowers an account's
+allowed concurrency as the balance falls, and the balance was at 0.09 USD. The fifth grading is the same transcript
+after a top-up, in full, and is the one to quote. It cost 0.22 USD (balance 2.09 before, 1.87 after), almost all of
+it the judge.
+
+The one failure of the fifth grading is role adherence on "off topic". The agent answered a request for a love poem
+with "Maaf, saya cuma bisa bantu soal film dan tiket di Tiketa Cinema, bukan bikin pantun. Kalau mau nonton bareng
+pacar, saya bisa carikan film dan jadwalnya." The role text says it declines in one sentence, and the judge counted
+two sentences and the offer against it. The in-house judge and the conditions passed the same reply. Read by hand it
+is a polite refusal that writes no poem, one sentence longer than its prompt asks.
 
 How the grading itself changed between runs, each for a reason found by reading the verdicts:
 
@@ -145,7 +152,8 @@ Full rows, with every reply and verdict: `results/2026-11-08-deepseek-flash-thin
 - 25 turns is a small sample, written by the same person who wrote the agent. A difference of one turn is one turn.
 - The judges are models. The in-house judge agreed with every failure read by hand, but it once passed a reply in
   the wrong language before its prompt changed, and it accepted a summary with no sentence because it was told to.
-- DeepEval's judge tokens were not counted: it reports no cost for a model whose price it does not know.
+- DeepEval's judge tokens were not counted: it reports no cost for a model whose price it does not know. All the
+  runs and gradings of 15 November together cost 1.48 USD on the DeepSeek account, one full grading 0.22 USD.
 - Most scenarios say "besok". The runs of 15 November were on a Sunday, so the next week's showtimes were published
   first (`scripts/publish_week.py --day` in tiketa-app). On a Sunday without that, tomorrow has no showtimes.
 - Bookings from runs stay in the booking service's database, like any other booking.
