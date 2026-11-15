@@ -75,6 +75,9 @@ def calls(*tool_calls: tuple[str, dict[str, Any]]) -> AIMessage:
     )
 
 
+BOOK = ("book_tickets", {"message_to_user": "Saya pilihkan kursinya, silakan cek ringkasannya."})
+
+
 def says(text: str) -> AIMessage:
     return AIMessage(content=text, usage_metadata={"input_tokens": 120, "output_tokens": 20, "total_tokens": 140})
 

@@ -32,14 +32,22 @@ def is_summary(message: BaseMessage) -> bool:
     return message.additional_kwargs.get("lc_source") == "summarization"
 
 
+def said_with_the_summary(message: AIMessage) -> str:
+    """The sentence the agent sends with a booking summary. It travels as an argument of book_tickets."""
+    sentences = (
+        call["args"].get("message_to_user", "") for call in message.tool_calls if call["name"] == "book_tickets"
+    )
+    return next(sentences, "")
+
+
 def turns_of(messages: list[BaseMessage]) -> list[Turn]:
     """What the user and the assistant said, without tool traffic or the summary of older messages."""
     turns: list[Turn] = []
     for message in messages:  # in conversation order
         if isinstance(message, HumanMessage) and not is_summary(message):
             turns.append(Turn(role="user", text=message.text))
-        elif isinstance(message, AIMessage) and message.text:
-            turns.append(Turn(role="assistant", text=message.text))
+        elif isinstance(message, AIMessage) and (said := message.text or said_with_the_summary(message)):
+            turns.append(Turn(role="assistant", text=said))
     return turns
 
 
@@ -81,6 +89,7 @@ def events_of(part: StreamPart[Any, Any], usage: TurnUsage) -> list[ChatEvent]:
         return []
     events: list[ChatEvent] = []
     for waiting in part["data"].get("__interrupt__", ()):
+        events.append(ChatEvent(type="message", text=waiting.value["message"]))
         events.append(ChatEvent(type="confirmation", data=waiting.value["summary"]))
     model_update = part["data"].get("model") or {}
     for message in model_update.get("messages", []):  # one reply per model call

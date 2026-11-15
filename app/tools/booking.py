@@ -34,6 +34,16 @@ class ShowtimeArgs(BaseModel):
     showtime_id: int
 
 
+class BookTicketsArgs(BaseModel):
+    # An argument, because a model that calls a tool often writes no text beside the call
+    message_to_user: str = Field(
+        min_length=1,
+        max_length=300,
+        description="One short sentence the user reads with the summary, in the language of their latest message: "
+        "which seats you picked, and that they can confirm or cancel",
+    )
+
+
 class UpdateBookingArgs(BaseModel):
     showtime_id: int | None = Field(default=None, description="The chosen showtime, from find_showtimes")
     seats: SeatIds | None = Field(default=None, description="Every seat of the booking, ids as in the seat map")
@@ -140,8 +150,8 @@ def build_tools(api: BookingApi, max_seats: int) -> list[BaseTool]:
         result = draft_text(merge_draft(draft, change))
         return Command(update={"draft": change, "messages": [ToolMessage(result, tool_call_id=runtime.tool_call_id)]})
 
-    @tool
-    async def book_tickets(runtime: Runtime) -> Command[None]:
+    @tool(args_schema=BookTicketsArgs)
+    async def book_tickets(message_to_user: str, runtime: Runtime) -> Command[None]:
         """Asks the user to confirm the booking in progress, then books it. Call it alone, once nothing is missing."""
         last_message = runtime.state["messages"][-1]
         if isinstance(last_message, AIMessage) and len(last_message.tool_calls) > 1:
@@ -170,7 +180,7 @@ def build_tools(api: BookingApi, max_seats: int) -> list[BaseTool]:
         )
         # Pauses the conversation until the user answers. On resume this tool runs again from the top
         answer = interrupt(
-            {"kind": "booking_confirmation", "summary": summary.model_dump(mode="json")},
+            {"kind": "booking_confirmation", "summary": summary.model_dump(mode="json"), "message": message_to_user},
             response_schema=ConfirmationAnswer,
         )
         typed_reply = [HumanMessage(answer.user_message)] if answer.user_message else []
