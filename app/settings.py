@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek/deepseek-flash"
     deepseek_api_key: SecretStr = Field(default=SecretStr(""), validation_alias=AliasChoices("DEEPSEEK_API_KEY"))
     gemini_api_key: SecretStr = Field(default=SecretStr(""), validation_alias=AliasChoices("GEMINI_API_KEY"))
+    gemini_api_key_2: SecretStr = Field(default=SecretStr(""), validation_alias=AliasChoices("GEMINI_API_KEY_2"))
+    gemini_api_key_3: SecretStr = Field(default=SecretStr(""), validation_alias=AliasChoices("GEMINI_API_KEY_3"))
+
+    @property
+    def gemini_api_keys(self) -> list[str]:
+        """All configured Gemini API keys in priority order for automatic quota failover."""
+        return [
+            k
+            for raw in (self.gemini_api_key, self.gemini_api_key_2, self.gemini_api_key_3)
+            if (k := raw.get_secret_value().strip())
+        ]
+
     # low turns DeepSeek's thinking mode on, none turns it off. With it, seats described in words ("at the back by the
     # aisle") came out right 3 of 3 times against 1 of 3, for 0.6 s more per turn (evals/README.md)
     llm_reasoning_effort: Literal["none", "low", "medium", "high"] = "low"

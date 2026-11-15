@@ -1,6 +1,8 @@
 """Chat models through LiteLLM. The model name alone switches provider: deepseek/..., gemini/..., and so on.
 With LLM_GATEWAY_URL set, every call goes through that gateway instead."""
 
+from typing import Any
+
 import litellm
 from langchain_litellm import ChatLiteLLM
 from litellm.exceptions import MidStreamFallbackError
@@ -14,7 +16,11 @@ litellm.suppress_debug_info = True
 def api_key_for(model: str, settings: Settings) -> str:
     """The provider's key for a LiteLLM model name. Refuses to start without one rather than fail every turn."""
     provider = litellm.get_llm_provider(model)[1]
-    keys = {"deepseek": settings.deepseek_api_key, "gemini": settings.gemini_api_key}
+    if provider == "gemini":
+        if not settings.gemini_api_keys:
+            raise RuntimeError(f"{model} needs {provider.upper()}_API_KEY in the secrets file")
+        return settings.gemini_api_keys[0]
+    keys = {"deepseek": settings.deepseek_api_key}
     if provider not in keys:
         raise RuntimeError(f"No API key setting for provider {provider!r} (model {model}). Add one to Settings")
     key = keys[provider].get_secret_value()
@@ -29,6 +35,10 @@ STREAM_DROPPED_ERRORS: tuple[type[Exception], ...] = (MidStreamFallbackError,)
 
 def build_chat_model(model: str, settings: Settings, reasoning_effort: str | None = None) -> ChatLiteLLM:
     """`reasoning_effort` overrides the setting, for calls that must not think (forced tool calls refuse it)."""
+    # LiteLLM turns "none" into DeepSeek's thinking: disabled, and passes reasoning back when it is on
+    model_kwargs: dict[str, Any] = {"reasoning_effort": reasoning_effort or settings.llm_reasoning_effort}
+    if litellm.get_llm_provider(model)[1] == "gemini" and len(settings.gemini_api_keys) > 1:
+        model_kwargs["fallbacks"] = [{"model": model, "api_key": key} for key in settings.gemini_api_keys[1:]]
     return ChatLiteLLM(
         model=model,
         api_key=api_key_for(model, settings),
@@ -37,8 +47,7 @@ def build_chat_model(model: str, settings: Settings, reasoning_effort: str | Non
         request_timeout=settings.llm_timeout_seconds,
         # Counts attempts, the first included: ChatLiteLLM retries timeouts, 429 and 5xx with backoff
         max_retries=settings.llm_max_attempts,
-        # LiteLLM turns "none" into DeepSeek's thinking: disabled, and passes reasoning back when it is on
-        model_kwargs={"reasoning_effort": reasoning_effort or settings.llm_reasoning_effort},
+        model_kwargs=model_kwargs,
         stream_options={"include_usage": True},
     )
 
