@@ -72,9 +72,10 @@ Details, every run and what each found: [evals/README.md](evals/README.md).
 
 The live runs found three things no unit test had: a rate limit at the booking service failed a whole turn, after
 Cancel the agent once said seats were "still set aside", and the agent wrote no sentence with any of ten summaries.
-All three are fixed. DeepEval graded three transcripts in full (8 to 10 of 13 conversations passing every check,
-112 of 114 conditions) and the last one only in part, because the DeepSeek balance ran low. Its pass rate after the
-last fix is therefore not known yet.
+All three are fixed. On the last run's transcript DeepEval passes 12 of 13 conversations on every check and 38 of
+38 conditions (tool use 10 of 10, reply language 13 of 13, role adherence 12 of 13). The one failure is a refusal of
+an off-topic request that took two sentences where the prompt asks for one. Earlier gradings passed 8 to 10 of 13,
+and much of that movement came from how the transcript was shown to the judge, which the evaluation notes record.
 
 On 8 November (v0.1.0, 17 turns) thinking was the difference on seats described in words: "three seats in the back
 row by the aisle" came out right 3 of 3 times with it and 1 of 3 without.
