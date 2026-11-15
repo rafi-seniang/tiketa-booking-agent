@@ -1,0 +1,22 @@
+# Weekly update PRs. A release must be 14 days old first, the same rule as for hand-picked versions:
+# a compromised release is usually found and pulled within days (litellm 1.82.7 and 1.82.8 were).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14

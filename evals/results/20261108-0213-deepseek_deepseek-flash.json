@@ -1,0 +1,87 @@
+[
+ {
+  "scenario": "step by step: film, then time, then seats, then name",
+  "turn": 1,
+  "user": "mau nonton interstellar",
+  "reply": "Interstellar (2014) masih tayang hari ini di Studio 7, harga Rp60.000 per kursi. Jadwalnya: 12:30, 15:15, 18:00, dan 20:45 WIB. Mau pilih jam yang mana, dan berapa kursi?",
+  "events": [
+   "tool",
+   "message",
+   "end"
+  ],
+  "token_events": 66,
+  "checks": [],
+  "seconds": 3.4,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 3489,
+   "output_tokens": 170
+  },
+  "verdict": "pass",
+  "reasoning": "The assistant responds in Indonesian (matching the user's language) and offers Interstellar's showtimes, asking which time and how many seats. It books nothing and does not claim a booking."
+ },
+ {
+  "scenario": "step by step: film, then time, then seats, then name",
+  "turn": 2,
+  "user": "besok aja, yang jam 18.00",
+  "reply": "Oke, besok Senin 09 November 2026 jam 18:00 WIB di Studio 7, harga Rp45.000 per kursi. Mau berapa kursi dan posisinya di mana (misal tengah atau belakang)?",
+  "events": [
+   "tool",
+   "message",
+   "end"
+  ],
+  "token_events": 54,
+  "checks": [],
+  "seconds": 2.2,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 4390,
+   "output_tokens": 177
+  },
+  "verdict": "pass",
+  "reasoning": "The assistant confirms Interstellar tomorrow (Monday 09 November 2026) at 18:00 and asks for the missing details (number of seats and position), without showing a booking summary yet. Language matches Indonesian."
+ },
+ {
+  "scenario": "step by step: film, then time, then seats, then name",
+  "turn": 3,
+  "user": "kursi G10 sama G11",
+  "reply": "Kursi G10 dan G11 kosong, jadi saya pilih itu ya. Atas nama siapa bukunya?",
+  "events": [
+   "tool",
+   "message",
+   "end"
+  ],
+  "token_events": 27,
+  "checks": [],
+  "seconds": 2.4,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 5586,
+   "output_tokens": 106
+  },
+  "verdict": "pass",
+  "reasoning": "The assistant confirms G10 and G11 are available, selects them, and asks for the name on the booking, matching the expected behaviour and staying in Indonesian."
+ },
+ {
+  "scenario": "step by step: film, then time, then seats, then name",
+  "turn": 4,
+  "user": "atas nama Nadia",
+  "reply": "\n[summary shown to the user: {\"movie_title\": \"Interstellar\", \"starts_at\": \"2026-11-09T11:00:00Z\", \"starts_at_local\": \"Monday 09 November 2026, 18:00 WIB\", \"studio_number\": 7, \"seats\": [\"G10\", \"G11\"], \"customer_name\": \"Nadia\", \"price_per_seat_idr\": 45000, \"total_price_idr\": 90000}]",
+  "events": [
+   "tool",
+   "tool",
+   "confirmation",
+   "end"
+  ],
+  "token_events": 0,
+  "checks": [],
+  "seconds": 2.8,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 6624,
+   "output_tokens": 218
+  },
+  "verdict": "pass",
+  "reasoning": "The assistant prepared the booking for Interstellar tomorrow (Monday 09 November 2026) at 18:00 WIB, seats G10 and G11, under the name Nadia, with correct pricing, and presented a summary for confirmation."
+ }
+]

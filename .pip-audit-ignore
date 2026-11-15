@@ -1,0 +1,18 @@
+# Known vulnerabilities accepted for now, one id per line. pip-audit in CI fails on any other.
+# filelock 3.32.7 (through litellm and huggingface_hub): local file-lock flaws (symlinks, permissions in shared
+# directories, Windows-only behaviour). They need someone who can already write to this machine; the service runs as
+# one non-root user in its container and never takes a lock path from a request. The fix is filelock 4.2.1, which
+# litellm allows from 1.108.x, released 5 to 7 Nov 2026. Review on 21 Nov 2026, when that release is two weeks old.
+CVE-2026-112907
+CVE-2026-112908
+CVE-2026-112909
+CVE-2026-112910
+CVE-2026-112911
+CVE-2026-112912
+CVE-2026-112913
+CVE-2026-112915
+CVE-2026-112935
+CVE-2026-112936
+CVE-2026-112938
+CVE-2026-112939
+CVE-2026-112940

@@ -8,18 +8,18 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 from litellm.exceptions import MidStreamFallbackError
 
-from app.cinema.schemas import BookingRequest, Showtime
-from app.cinema.store import CinemaStore
-from app.features.chat.agent import build_agent
-from app.features.chat.state import ChatContext
-from config.settings import Settings
+from app.core.errors import RateLimited
+from app.schemas.agent import ChatContext
+from app.schemas.cinema import Showtime
+from app.services.booking_agent import build_agent
+from app.settings import Settings
 
-from conftest import CINEMA_TIMEZONE, NOW
-from fakes import ScriptedChatModel, calls, says
+from conftest import CALLER, NOW
+from fakes import BOOK, FakeBookingApi, ScriptedChatModel, calls, says
 
 Agent = CompiledStateGraph[Any, Any, Any, Any]
 CONFIG: Any = {"configurable": {"thread_id": "s1"}}
-CONTEXT = ChatContext(session_id="s1", now=NOW)
+CONTEXT = ChatContext(session_id="s1", caller=CALLER, now=NOW)
 
 
 def choose(showtime: Showtime, seats: list[str], name: str | None = "Rafi") -> tuple[str, dict[str, Any]]:
@@ -38,60 +38,69 @@ async def tool_messages(agent: Agent) -> list[ToolMessage]:
     return [message for message in state.values["messages"] if isinstance(message, ToolMessage)]
 
 
-async def someone_else_books(store: CinemaStore, showtime: Showtime, seats: list[str]) -> None:
-    other = BookingRequest(
-        idempotency_key="other", session_id="s2", showtime_id=showtime.id, seats=seats, customer_name="X"
-    )
-    await store.book(other, NOW)
-
-
 async def test_a_booking_waits_for_the_user_then_books_what_was_shown(
-    agent: Agent, model: ScriptedChatModel, store: CinemaStore, dune_today: list[Showtime]
+    agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
 ) -> None:
     evening = dune_today[2]
-    model.replies += [calls(choose(evening, ["D9", "D10"])), calls(("book_tickets", {})), says("Sudah dipesan.")]
+    model.replies += [calls(choose(evening, ["D9", "D10"])), calls(BOOK), says("Sudah dipesan.")]
     await ask(agent, "dune jam 6 sore, 2 kursi tengah, atas nama Rafi")
 
     waiting = (await agent.aget_state(CONFIG)).interrupts
     summary = waiting[0].value["summary"]
     assert summary["seats"] == ["D9", "D10"]
-    assert summary["total_price_idr"] == 2 * evening.price_idr  # priced from the database, not by the model
-    assert await store.bookings_for_session("s1") == []
+    assert summary["total_price_idr"] == 2 * evening.price_idr  # priced by the booking service, not by the model
+    assert await api.bookings_of_session("s1", CALLER) == []
 
     await agent.ainvoke(Command(resume={"approved": True}), CONFIG, context=CONTEXT)
-    bookings = await store.bookings_for_session("s1")
+    bookings = await api.bookings_of_session("s1", CALLER)
     assert [booking.seats for booking in bookings] == [["D9", "D10"]]
     state = await agent.aget_state(CONFIG)
     assert state.values["draft"]["seats"] == [] and state.values["draft"]["customer_name"] == "Rafi"
     assert bookings[0].code in (await tool_messages(agent))[-1].text
 
 
-async def test_cancel_books_nothing(
-    agent: Agent, model: ScriptedChatModel, store: CinemaStore, dune_today: list[Showtime]
+async def test_every_call_to_the_booking_service_is_made_as_the_person_in_the_conversation(
+    agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["A1"])), calls(("book_tickets", {})), says("Oke, dibatalkan.")]
+    today = NOW.date().isoformat()
+    model.replies += [
+        calls(("find_showtimes", {"day": today})),
+        calls(choose(dune_today[2], ["A1"])),
+        calls(BOOK),
+        says("Sudah dipesan."),
+    ]
+    await ask(agent, "dune jam 6, A1, Rafi")
+    await agent.ainvoke(Command(resume={"approved": True}), CONFIG, context=CONTEXT)
+    assert api.seen_callers and all(caller == CALLER for caller in api.seen_callers)
+    assert [owner for owner, _, _, _ in api.bookings] == [CALLER.name]
+
+
+async def test_cancel_books_nothing(
+    agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
+) -> None:
+    model.replies += [calls(choose(dune_today[2], ["A1"])), calls(BOOK), says("Oke, dibatalkan.")]
     await ask(agent, "dune jam 6, A1, Rafi")
     await agent.ainvoke(Command(resume={"approved": False}), CONFIG, context=CONTEXT)
-    assert await store.bookings_for_session("s1") == []
+    assert await api.bookings_of_session("s1", CALLER) == []
     assert "pressed Cancel" in (await tool_messages(agent))[-1].text
 
 
 async def test_a_typed_reply_to_the_confirmation_joins_the_conversation(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["A1"])), calls(("book_tickets", {})), says("Mau ganti ke mana?")]
+    model.replies += [calls(choose(dune_today[2], ["A1"])), calls(BOOK), says("Mau ganti ke mana?")]
     await ask(agent, "dune jam 6, A1, Rafi")
     await agent.ainvoke(Command(resume={"approved": False, "user_message": "ganti D5 aja"}), CONFIG, context=CONTEXT)
-    tool_result, typed_reply = model.received[-1][-2:]
+    tool_result, typed_reply = model.received[-1][-3:-1]  # the turn context comes last
     assert isinstance(tool_result, ToolMessage) and "instead of confirming" in tool_result.text
     assert isinstance(typed_reply, HumanMessage) and typed_reply.text == "ganti D5 aja"
 
 
 async def test_a_taken_seat_goes_back_to_the_model_and_changes_nothing(
-    agent: Agent, model: ScriptedChatModel, store: CinemaStore, dune_today: list[Showtime]
+    agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
 ) -> None:
     evening = dune_today[2]
-    await someone_else_books(store, evening, ["D9"])
+    await api.someone_else_books(evening, ["D9"])
     model.replies += [calls(choose(evening, ["D9", "D10"])), says("D9 sudah terisi.")]
     await ask(agent, "dune jam 6, D9 dan D10")
     refusal = (await tool_messages(agent))[-1]
@@ -99,19 +108,38 @@ async def test_a_taken_seat_goes_back_to_the_model_and_changes_nothing(
     assert (await agent.aget_state(CONFIG)).values.get("draft", {}) == {}
 
 
-async def test_an_unknown_seat_id_is_refused_before_the_tool_runs(
+async def test_a_rate_limit_at_the_booking_service_goes_back_to_the_model_with_the_wait(
+    agent: Agent,
+    model: ScriptedChatModel,
+    api: FakeBookingApi,
+    dune_today: list[Showtime],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def over_the_limit(showtime_id: int, caller: Any) -> Showtime:
+        raise RateLimited("Over 60 requests a minute.", 20)
+
+    monkeypatch.setattr(api, "get_showtime", over_the_limit)
+    model.replies += [calls(choose(dune_today[2], ["D9"])), says("Sebentar ya, coba lagi 20 detik lagi.")]
+    reply = await ask(agent, "dune jam 6, D9")
+    refusal = (await tool_messages(agent))[-1]
+    assert refusal.status == "error" and "try again in 20 seconds" in refusal.text
+    assert reply["messages"][-1].text == "Sebentar ya, coba lagi 20 detik lagi."
+
+
+async def test_a_seat_the_booking_service_does_not_know_is_refused(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["d5"])), says("Kursinya D5 ya?")]
+    model.replies += [calls(choose(dune_today[2], ["d5", "K3"])), says("Kursinya D5 ya?")]
     await ask(agent, "dune jam 6 kursi d5")
     refusal = (await tool_messages(agent))[-1]
-    assert refusal.status == "error" and "not a seat" in refusal.text
+    assert refusal.status == "error" and "d5, K3 is not a seat" in refusal.text
+    assert (await agent.aget_state(CONFIG)).values.get("draft", {}) == {}
 
 
 async def test_book_tickets_refuses_a_booking_with_something_missing(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["A1"], name=None)), calls(("book_tickets", {})), says("Atas nama?")]
+    model.replies += [calls(choose(dune_today[2], ["A1"], name=None)), calls(BOOK), says("Atas nama?")]
     await ask(agent, "dune jam 6 kursi A1")
     assert not (await agent.aget_state(CONFIG)).interrupts
     assert "Still needed: name on the booking" in (await tool_messages(agent))[-1].text
@@ -120,41 +148,69 @@ async def test_book_tickets_refuses_a_booking_with_something_missing(
 async def test_book_tickets_must_be_called_on_its_own(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
-    model.replies += [calls(choose(dune_today[2], ["A1"]), ("book_tickets", {})), says("Sebentar.")]
+    model.replies += [calls(choose(dune_today[2], ["A1"]), BOOK), says("Sebentar.")]
     await ask(agent, "dune jam 6 kursi A1 atas nama Rafi, langsung pesan")
     assert not (await agent.aget_state(CONFIG)).interrupts
     assert any("on its own" in message.text for message in await tool_messages(agent))
 
 
 async def test_a_seat_sold_while_the_user_decides_is_not_booked_twice(
-    agent: Agent, model: ScriptedChatModel, store: CinemaStore, dune_today: list[Showtime]
+    agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
 ) -> None:
     evening = dune_today[2]
-    model.replies += [calls(choose(evening, ["D9"])), calls(("book_tickets", {})), says("Maaf, D9 baru saja terisi.")]
+    model.replies += [calls(choose(evening, ["D9"])), calls(BOOK), says("Maaf, D9 baru saja terisi.")]
     await ask(agent, "dune jam 6, D9, Rafi")
-    await someone_else_books(store, evening, ["D9"])
+    await api.someone_else_books(evening, ["D9"])
     await agent.ainvoke(Command(resume={"approved": True}), CONFIG, context=CONTEXT)
-    assert await store.bookings_for_session("s1") == []
+    assert await api.bookings_of_session("s1", CALLER) == []
     assert "Already taken: D9" in (await tool_messages(agent))[-1].text
 
 
-async def test_the_prompt_holds_the_local_time_and_the_booking_so_far(
+async def test_the_seat_map_reads_as_the_room_with_taken_seats_the_aisle_and_the_walkway(
+    agent: Agent, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
+) -> None:
+    await api.someone_else_books(dune_today[2], ["A9", "M18"])
+    model.replies += [calls(("get_seat_map", {"showtime_id": dune_today[2].id})), says("Ini kursinya.")]
+    await ask(agent, "kursi yang kosong apa aja?")
+    lines = (await tool_messages(agent))[-1].text.splitlines()
+    assert lines[0].startswith("Dune: Part Two, Sunday 08 November 2026, 18:00 WIB, studio 9")
+    assert "rows E to H, seats 6 to 13" in lines[1]
+    assert lines[2] == "SCREEN (front)" and "A8 -- | A10" in lines[3]
+    assert lines[13] == "(walkway)" and lines[-2].endswith("M17 --")
+
+
+async def test_the_last_message_holds_the_local_time_and_the_booking_so_far(
     agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
 ) -> None:
     model.replies += [calls(choose(dune_today[2], ["D9"], name=None)), says("Atas nama siapa?")]
     await ask(agent, "dune jam 6, D9")
-    first_prompt, second_prompt = (calls_seen[0] for calls_seen in model.received)
-    assert isinstance(first_prompt, SystemMessage) and isinstance(second_prompt, SystemMessage)
-    assert "Now: Sunday 08 November 2026, 10:00 WIB" in first_prompt.text
-    assert "Still needed: showtime, seats, name on the booking" in first_prompt.text
-    assert "- Seats: D9" in second_prompt.text and "Still needed: name on the booking" in second_prompt.text
+    first_context, second_context = (calls_seen[-1] for calls_seen in model.received)
+    assert isinstance(first_context, SystemMessage) and isinstance(second_context, SystemMessage)
+    assert "Now: Sunday 08 November 2026, 10:00 WIB" in first_context.text
+    assert "Still needed: showtime, seats, name on the booking" in first_context.text
+    assert "- Seats: D9" in second_context.text and "Still needed: name on the booking" in second_context.text
+
+
+async def test_every_call_starts_with_the_same_text_so_the_provider_can_cache_it(
+    agent: Agent, model: ScriptedChatModel, dune_today: list[Showtime]
+) -> None:
+    model.replies += [calls(choose(dune_today[2], ["D9"], name=None)), says("Atas nama siapa?")]
+    await ask(agent, "dune jam 6, D9")
+    first_call, second_call = model.received
+    assert second_call[: len(first_call) - 1] == first_call[:-1]  # only the context at the end differs
+    assert all(not isinstance(message, SystemMessage) or "Now:" not in message.text for message in second_call[:-1])
+    state = await agent.aget_state(CONFIG)
+    assert not any(isinstance(message, SystemMessage) for message in state.values["messages"])
 
 
 async def test_a_turn_that_keeps_calling_tools_is_stopped(
-    model: ScriptedChatModel, store: CinemaStore, settings: Settings
+    model: ScriptedChatModel, api: FakeBookingApi, settings: Settings
 ) -> None:
     limited = settings.model_copy(update={"max_model_calls_per_turn": 2})
-    agent = build_agent(model, store, await store.list_movies(), limited, CINEMA_TIMEZONE, InMemorySaver())
+    api_any: Any = api
+    agent = build_agent(
+        model, api_any, await api.list_movies(CALLER), await api.cinema(CALLER), limited, InMemorySaver()
+    )
     model.replies += [calls(("find_showtimes", {"day": "2026-11-08"})) for _ in range(3)]
     with pytest.raises(ModelCallLimitExceededError):
         await ask(agent, "jadwal hari ini")

@@ -1,0 +1,83 @@
+[
+ {
+  "scenario": "step by step: film, then time, then seats, then name",
+  "turn": 1,
+  "user": "mau nonton interstellar",
+  "reply": "Siap! Interstellar hari ini main di Studio 7, harga Rp60.000 per kursi. Jadwalnya:\n\n- 12:30 WIB\n- 15:15 WIB\n- 18:00 WIB\n- 20:45 WIB\n\nMau pilih jam berapa? Sekalian kasih tahu berapa tiket dan posisi kursi yang diinginkan ya.",
+  "events": [
+   "tool",
+   "message",
+   "end"
+  ],
+  "token_events": 86,
+  "checks": [],
+  "seconds": 3.8,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 3510,
+   "cached_input_tokens": 1664,
+   "output_tokens": 211
+  }
+ },
+ {
+  "scenario": "step by step: film, then time, then seats, then name",
+  "turn": 2,
+  "user": "besok aja, yang jam 18.00",
+  "reply": "Oke, besok Senin 09 November jam 18:00 ada, harga Rp45.000 per kursi di Studio 7. Mau berapa tiket dan kursinya di bagian mana?",
+  "events": [
+   "tool",
+   "message",
+   "end"
+  ],
+  "token_events": 42,
+  "checks": [],
+  "seconds": 1.9,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 4472,
+   "cached_input_tokens": 2048,
+   "output_tokens": 131
+  }
+ },
+ {
+  "scenario": "step by step: film, then time, then seats, then name",
+  "turn": 3,
+  "user": "kursi G10 sama G11",
+  "reply": "G10 dan G11 masih kosong, dua-duanya di tengah studio dan bersebelahan. Atas nama siapa booking-nya?",
+  "events": [
+   "tool",
+   "message",
+   "end"
+  ],
+  "token_events": 30,
+  "checks": [],
+  "seconds": 2.4,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 5580,
+   "cached_input_tokens": 4736,
+   "output_tokens": 111
+  }
+ },
+ {
+  "scenario": "step by step: film, then time, then seats, then name",
+  "turn": 4,
+  "user": "atas nama Nadia",
+  "reply": "\n[summary shown to the user: {\"movie_title\": \"Interstellar\", \"starts_at\": \"2026-11-09T11:00:00Z\", \"starts_at_local\": \"Monday 09 November 2026, 18:00 WIB\", \"studio_number\": 7, \"seats\": [\"G10\", \"G11\"], \"customer_name\": \"Nadia\", \"price_per_seat_idr\": 45000, \"total_price_idr\": 90000}]",
+  "events": [
+   "tool",
+   "tool",
+   "confirmation",
+   "end"
+  ],
+  "token_events": 0,
+  "checks": [],
+  "seconds": 2.1,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 6515,
+   "cached_input_tokens": 3328,
+   "output_tokens": 106
+  }
+ }
+]

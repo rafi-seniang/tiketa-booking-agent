@@ -4,18 +4,20 @@ import httpx
 import pytest
 from langchain_core.messages import ToolMessage
 
-from app.cinema.schemas import Showtime
-from app.cinema.seat_layout import ROWS_FRONT_TO_BACK
-from app.cinema.store import CinemaStore
-from app.features.chat.service import ChatService
+from app.core.errors import BookingApiUnavailable, Unauthorized
+from app.core.token_budget import InMemoryTokenBudget
+from app.schemas.cinema import Showtime
+from app.services.chat import ChatService
 
-from conftest import FakeReader, parse_events
-from fakes import ScriptedChatModel, calls, says
+from conftest import OWNER, FakeReader, parse_events
+from fakes import BOOK, FakeBookingApi, ScriptedChatModel, calls, says
+
+SENTENCE = BOOK[1]["message_to_user"]
 
 
 def booking_replies(showtime: Showtime) -> list[Any]:
     choose = ("update_booking", {"showtime_id": showtime.id, "seats": ["D9", "D10"], "customer_name": "Rafi"})
-    return [calls(choose), calls(("book_tickets", {}))]
+    return [calls(choose), calls(BOOK)]
 
 
 async def start(client: httpx.AsyncClient) -> str:
@@ -38,8 +40,9 @@ async def test_a_conversation_books_only_after_confirm(
     session_id = await start(client)
 
     events = await send(client, session_id, "dune jam 6 sore, 2 kursi tengah, atas nama Rafi")
-    assert [event["type"] for event in events] == ["tool", "tool", "confirmation", "end"]
-    assert events[2]["data"]["seats"] == ["D9", "D10"]
+    assert [event["type"] for event in events] == ["tool", "tool", "message", "confirmation", "end"]
+    assert events[2]["text"] == SENTENCE  # the agent's words arrive with the summary, though it only called a tool
+    assert events[3]["data"]["seats"] == ["D9", "D10"]
     assert events[-1]["data"]["model_calls"] == 2
     view = (await client.get(f"/v1/sessions/{session_id}")).json()
     assert view["pending_confirmation"]["total_price_idr"] == 2 * dune_today[2].price_idr
@@ -51,7 +54,18 @@ async def test_a_conversation_books_only_after_confirm(
     view = (await client.get(f"/v1/sessions/{session_id}")).json()
     assert view["pending_confirmation"] is None
     assert view["bookings"][0]["code"] == events[0]["data"]["code"]
-    assert [turn["role"] for turn in view["turns"]] == ["user", "assistant"]
+    assert [turn["role"] for turn in view["turns"]] == ["user", "assistant", "assistant"]
+
+
+async def test_a_booking_in_the_chat_belongs_to_the_caller_the_booking_service_named(
+    client: httpx.AsyncClient, model: ScriptedChatModel, api: FakeBookingApi, dune_today: list[Showtime]
+) -> None:
+    model.replies += [*booking_replies(dune_today[2]), says("Sudah dipesan.")]
+    session_id = await start(client)
+    await send(client, session_id, "dune jam 6 sore, 2 kursi tengah, atas nama Rafi")
+    await client.post(f"/v1/sessions/{session_id}/confirmation", json={"approved": True})
+    owner, _, booking, booked_in = api.bookings[0]
+    assert owner == OWNER and booked_in == session_id and booking.seats == ["D9", "D10"]
 
 
 async def test_a_typed_yes_while_a_booking_waits_is_read_by_the_model(
@@ -67,6 +81,7 @@ async def test_a_typed_yes_while_a_booking_waits_is_read_by_the_model(
     view = (await client.get(f"/v1/sessions/{session_id}")).json()
     assert [turn["text"] for turn in view["turns"]] == [
         "dune jam 6 sore, 2 kursi tengah, atas nama Rafi",
+        SENTENCE,
         "iya gas",
         "Siap, sudah dipesan.",
     ]
@@ -87,44 +102,53 @@ async def test_another_caller_cannot_see_or_use_a_conversation(client: httpx.Asy
     assert sent.status_code == 404
 
 
+async def test_a_caller_the_booking_service_refuses_is_refused_here(
+    client: httpx.AsyncClient, api: FakeBookingApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def refuse(credentials: dict[str, str]) -> str:
+        raise Unauthorized("Missing or invalid API key")
+
+    monkeypatch.setattr(api, "caller_name", refuse)
+    response = await client.post("/v1/sessions")
+    assert response.status_code == 401 and response.headers["content-type"] == "application/problem+json"
+    assert (await client.get("/health")).status_code == 200
+
+
+async def test_the_agent_fails_loudly_when_the_booking_service_is_down(
+    client: httpx.AsyncClient, api: FakeBookingApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def down(credentials: dict[str, str]) -> str:
+        raise BookingApiUnavailable("The booking service did not answer (ConnectError)")
+
+    monkeypatch.setattr(api, "caller_name", down)
+    response = await client.post("/v1/sessions")
+    assert response.status_code == 503 and "booking service" in response.json()["detail"]
+
+
 async def test_a_second_message_while_a_turn_runs_is_a_conflict(client: httpx.AsyncClient, chat: ChatService) -> None:
     session_id = await start(client)
-    await chat.begin_turn(session_id)  # as if a reply were still streaming
+    await chat.begin_turn(session_id, OWNER)  # as if a reply were still streaming
     response = await client.post(f"/v1/sessions/{session_id}/messages", json={"message": "halo"})
     assert response.status_code == 409
 
 
 async def test_a_failed_turn_says_so_and_the_conversation_carries_on(
-    client: httpx.AsyncClient, model: ScriptedChatModel, store: CinemaStore, monkeypatch: pytest.MonkeyPatch
+    client: httpx.AsyncClient, model: ScriptedChatModel, api: FakeBookingApi, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def database_down(*args: Any) -> None:
-        raise ConnectionError("database unreachable")
+    async def booking_service_down(*args: Any) -> None:
+        raise BookingApiUnavailable("The booking service did not answer (ConnectError)")
 
     model.replies += [calls(("get_seat_map", {"showtime_id": 1})), says("Halo, ada yang bisa dibantu?")]
     session_id = await start(client)
     with monkeypatch.context() as patch:
-        patch.setattr(store, "get_showtime", database_down)
+        patch.setattr(api, "seat_map", booking_service_down)
         events = await send(client, session_id, "kursi yang kosong apa aja?")
     assert events[-2]["type"] == "error" and events[-1]["type"] == "end"
 
     events = await send(client, session_id, "halo")
     assert [event["type"] for event in events] == ["message", "end"]
-    unfinished_call_answer = model.received[-1][-2]
+    unfinished_call_answer = model.received[-1][-3]  # before the new message and the turn context
     assert isinstance(unfinished_call_answer, ToolMessage) and "previous turn failed" in unfinished_call_answer.text
-
-
-async def test_the_catalog_lists_films_showtimes_and_seats(client: httpx.AsyncClient) -> None:
-    movies = (await client.get("/v1/movies")).json()
-    assert len(movies) == 21
-    showtimes = (await client.get("/v1/showtimes", params={"day": "2026-11-08", "movie_id": 9})).json()
-    assert [showtime["starts_at"] for showtime in showtimes][0] == "2026-11-08T05:30:00Z"
-    seats = (await client.get(f"/v1/showtimes/{showtimes[0]['id']}/seats")).json()
-    assert [row["row"] for row in seats["rows"]] == list(ROWS_FRONT_TO_BACK)
-
-
-async def test_requests_without_the_api_key_are_refused(client: httpx.AsyncClient) -> None:
-    assert (await client.get("/v1/movies", headers={"X-API-Key": "wrong"})).status_code == 401
-    assert (await client.get("/health", headers={"X-API-Key": "wrong"})).status_code == 200
 
 
 async def test_a_failure_before_the_agent_runs_is_an_error_event_and_frees_the_turn(
@@ -141,3 +165,27 @@ async def test_a_failure_before_the_agent_runs_is_an_error_event_and_frees_the_t
     assert [event["type"] for event in events] == ["error", "end"]
     again = await client.post(f"/v1/sessions/{session_id}/confirmation", json={"approved": False})
     assert again.status_code == 200  # the lock was released and the booking still waits
+
+
+async def test_chat_turns_stop_when_the_days_tokens_are_used_up(
+    client: httpx.AsyncClient, model: ScriptedChatModel, budget: InMemoryTokenBudget
+) -> None:
+    model.replies += [says("Halo, ada yang bisa dibantu?")]
+    session_id = await start(client)
+    events = await send(client, session_id, "halo")
+    usage = (await client.get("/v1/usage")).json()
+    assert usage["used_tokens"] == events[-1]["data"]["input_tokens"] + events[-1]["data"]["output_tokens"] > 0
+
+    await budget.add(OWNER, usage["daily_tokens"])
+    refused = await client.post(f"/v1/sessions/{session_id}/messages", json={"message": "halo lagi"})
+    assert refused.status_code == 429 and int(refused.headers["Retry-After"]) > 0
+    assert "used up" in refused.json()["detail"]
+
+
+async def test_the_chat_closes_for_everyone_at_the_days_total(
+    client: httpx.AsyncClient, budget: InMemoryTokenBudget
+) -> None:
+    session_id = await start(client)
+    await budget.add("guest:many-other-callers", 50_000)
+    refused = await client.post(f"/v1/sessions/{session_id}/messages", json={"message": "halo"})
+    assert refused.status_code == 429 and "closed for today" in refused.json()["detail"]

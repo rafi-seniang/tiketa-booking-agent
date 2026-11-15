@@ -52,6 +52,41 @@
     "bookings": 0
   },
   {
+    "name": "moves to another day while the summary waits",
+    "turns": [
+      {"say": "dune lusa jam 18.00, 2 kursi F8 sama F9, atas nama Rafi", "events": ["confirmation"],
+       "expect": "Prepares the booking for Dune: Part Two the day after tomorrow at 18:00 with F8 and F9 and asks for confirmation."},
+      {"say": "eh gajadi deh, besok aja untuk film yang sama di jam paling malamnya, jumlah kursinya sama tapi di belakang",
+       "events": ["confirmation"], "forbid": ["booking"],
+       "expect": "Does not book the first summary. Moves to Dune: Part Two tomorrow (not the day after) at its latest showtime, picks two free adjacent seats in a back row (L or M), says which, and asks for confirmation again."}
+    ],
+    "bookings": 0
+  },
+  {
+    "name": "step by step: film, then time, then seats, then name",
+    "turns": [
+      {"say": "mau nonton interstellar", "forbid": ["confirmation", "booking"],
+       "expect": "Asks which day or time, or offers Interstellar's showtimes. Books nothing."},
+      {"say": "besok aja, yang jam 18.00", "forbid": ["confirmation", "booking"],
+       "expect": "Takes Interstellar tomorrow at 18:00 and asks for what is still missing (seats, name). Does not show a summary yet."},
+      {"say": "kursi G10 sama G11", "forbid": ["confirmation", "booking"],
+       "expect": "Takes G10 and G11, or says they are taken, and asks for the name on the booking."},
+      {"say": "atas nama Nadia", "events": ["confirmation"], "forbid": ["booking"],
+       "expect": "Prepares Interstellar tomorrow at 18:00, seats G10 and G11, name Nadia, and asks for confirmation."}
+    ],
+    "bookings": 0
+  },
+  {
+    "name": "seats named before the showtime",
+    "turns": [
+      {"say": "mau nonton parasite, kursinya H9 sama H10 ya", "forbid": ["confirmation", "booking"],
+       "expect": "Asks which day and time, or offers Parasite's showtimes. Does not invent a showtime and books nothing."},
+      {"say": "besok yang paling malem, atas nama Joko", "events": ["confirmation"], "forbid": ["booking"],
+       "expect": "Takes Parasite tomorrow at its latest showtime, keeps the seats H9 and H10 asked for earlier (or says if they are taken), and asks for confirmation."}
+    ],
+    "bookings": 0
+  },
+  {
     "name": "seats described in words",
     "turns": [
       {"say": "dune besok yang 20.45, 3 kursi paling belakang deket lorong, atas nama Budi", "events": ["confirmation"],

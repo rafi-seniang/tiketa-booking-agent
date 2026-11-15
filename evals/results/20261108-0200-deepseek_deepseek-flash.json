@@ -1,0 +1,50 @@
+[
+ {
+  "scenario": "moves to another day while the summary waits",
+  "turn": 1,
+  "user": "dune lusa jam 18.00, 2 kursi F8 sama F9, atas nama Rafi",
+  "reply": "\n[summary shown to the user: {\"movie_title\": \"Dune: Part Two\", \"starts_at\": \"2026-11-10T11:00:00Z\", \"starts_at_local\": \"Tuesday 10 November 2026, 18:00 WIB\", \"studio_number\": 9, \"seats\": [\"F8\", \"F9\"], \"customer_name\": \"Rafi\", \"price_per_seat_idr\": 45000, \"total_price_idr\": 90000}]",
+  "events": [
+   "tool",
+   "tool",
+   "tool",
+   "tool",
+   "confirmation",
+   "end"
+  ],
+  "token_events": 0,
+  "checks": [],
+  "seconds": 4.9,
+  "usage": {
+   "model_calls": 4,
+   "input_tokens": 9116,
+   "output_tokens": 348
+  },
+  "verdict": "pass",
+  "reasoning": "The assistant prepared the booking for Dune: Part Two on the day after tomorrow (Tuesday 10 November 2026) at 18:00 WIB with seats F8 and F9 under Rafi, and the summary shown to the user asks for confirmation. This matches the expected behaviour."
+ },
+ {
+  "scenario": "moves to another day while the summary waits",
+  "turn": 2,
+  "user": "eh gajadi deh, besok aja untuk film yang sama di jam paling malamnya, jumlah kursinya sama tapi di belakang",
+  "reply": "\n[summary shown to the user: {\"movie_title\": \"Dune: Part Two\", \"starts_at\": \"2026-11-09T13:45:00Z\", \"starts_at_local\": \"Monday 09 November 2026, 20:45 WIB\", \"studio_number\": 9, \"seats\": [\"M8\", \"M9\"], \"customer_name\": \"Rafi\", \"price_per_seat_idr\": 45000, \"total_price_idr\": 90000}]",
+  "events": [
+   "tool",
+   "tool",
+   "tool",
+   "tool",
+   "confirmation",
+   "end"
+  ],
+  "token_events": 0,
+  "checks": [],
+  "seconds": 5.6,
+  "usage": {
+   "model_calls": 4,
+   "input_tokens": 14544,
+   "output_tokens": 413
+  },
+  "verdict": "pass",
+  "reasoning": "The assistant moved to Dune: Part Two tomorrow (Monday 09 November 2026) at its latest showtime (20:45 WIB), picked two adjacent back-row seats (M8, M9), stated them, and asked for confirmation again without booking."
+ }
+]

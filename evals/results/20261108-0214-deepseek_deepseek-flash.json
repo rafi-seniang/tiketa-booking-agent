@@ -1,0 +1,47 @@
+[
+ {
+  "scenario": "seats named before the showtime",
+  "turn": 1,
+  "user": "mau nonton parasite, kursinya H9 sama H10 ya",
+  "reply": "Siap, Parasite hari ini ada 4 jadwal: 13:00, 15:45, 18:30, dan 21:15 WIB (Rp60.000 per kursi). Mau pilih jam yang mana? Nanti kursi H9 dan H10 saya cek ketersediaannya di jadwal itu.",
+  "events": [
+   "tool",
+   "message",
+   "end"
+  ],
+  "token_events": 74,
+  "checks": [],
+  "seconds": 2.8,
+  "usage": {
+   "model_calls": 2,
+   "input_tokens": 3534,
+   "output_tokens": 237
+  },
+  "verdict": "pass",
+  "reasoning": "The assistant asks which showtime the user wants and offers Parasite's showtimes without inventing a booking or claiming a booking code. It correctly uses Indonesian and does not book anything yet."
+ },
+ {
+  "scenario": "seats named before the showtime",
+  "turn": 2,
+  "user": "besok yang paling malem, atas nama Joko",
+  "reply": "\n[summary shown to the user: {\"movie_title\": \"Parasite\", \"starts_at\": \"2026-11-09T14:15:00Z\", \"starts_at_local\": \"Monday 09 November 2026, 21:15 WIB\", \"studio_number\": 18, \"seats\": [\"H9\", \"H10\"], \"customer_name\": \"Joko\", \"price_per_seat_idr\": 45000, \"total_price_idr\": 90000}]",
+  "events": [
+   "tool",
+   "tool",
+   "tool",
+   "tool",
+   "confirmation",
+   "end"
+  ],
+  "token_events": 0,
+  "checks": [],
+  "seconds": 5.1,
+  "usage": {
+   "model_calls": 4,
+   "input_tokens": 11236,
+   "output_tokens": 530
+  },
+  "verdict": "pass",
+  "reasoning": "The assistant selected Parasite tomorrow at its latest showtime (21:15 WIB), kept seats H9 and H10, used the name Joko, and presented a summary asking for confirmation. This matches the expected behaviour."
+ }
+]
