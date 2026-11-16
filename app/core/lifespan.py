@@ -20,6 +20,7 @@ from app.generative.confirmation import ConfirmationReader
 from app.middleware.rate_limit import InMemoryRateLimiter, RateLimiter, RedisRateLimiter
 from app.repositories.booking_api import BookingApi
 from app.repositories.chat_sessions import SessionStore
+from app.repositories.gatekeeper import Gatekeeper
 from app.schemas.cinema import Caller
 from app.services.booking_agent import build_agent
 from app.services.chat import ChatService
@@ -50,6 +51,16 @@ async def open_resources(settings: Settings) -> AsyncIterator[Resources]:
             httpx.AsyncClient(base_url=settings.booking_api_url, timeout=settings.booking_api_timeout_seconds)
         )
         api = BookingApi(http)
+        gate = None
+        if settings.gatekeeper_url:
+            gate_http = await stack.enter_async_context(
+                httpx.AsyncClient(
+                    base_url=settings.gatekeeper_url,
+                    headers={"X-API-Key": settings.gatekeeper_api_key.get_secret_value()},
+                    timeout=settings.gatekeeper_timeout_seconds,
+                )
+            )
+            gate = Gatekeeper(gate_http, settings.gatekeeper_scope_name)
         # The agent is an add-on to the booking service. Without it there is nothing to book, so it does not start
         cinema = await api.cinema(service_caller(settings))
         movies = await api.list_movies(service_caller(settings))
@@ -78,6 +89,7 @@ async def open_resources(settings: Settings) -> AsyncIterator[Resources]:
             budget,
             settings.daily_tokens_per_caller,
             settings.daily_tokens_total,
+            gate,
         )
         yield Resources(chat=chat, api=api, rate_limiter=rate_limiter, model_name=settings.llm_model)
 

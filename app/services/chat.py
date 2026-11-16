@@ -12,12 +12,13 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command, StateSnapshot, StreamMode, StreamPart
 
-from app.core.errors import Conflict, RateLimited
+from app.core.errors import Conflict, GateUnavailable, RateLimited
 from app.core.locks import KeyLock
 from app.core.token_budget import EVERYONE, TokenBudget, seconds_to_reset
 from app.generative.confirmation import ConfirmationReader
 from app.repositories.booking_api import BookingApi
 from app.repositories.chat_sessions import SessionStore
+from app.repositories.gatekeeper import Gatekeeper
 from app.schemas.agent import ChatContext
 from app.schemas.chat import BookingSummary, ChatEvent, SessionView, TokenUsageView, Turn
 from app.schemas.cinema import Caller
@@ -26,6 +27,18 @@ logger = logging.getLogger(__name__)
 
 STREAM_MODES: list[StreamMode] = ["messages", "updates", "custom"]
 FAILED_TURN_TEXT = "The assistant could not finish this reply. Please try again."
+GATE_DOWN_TEXT = "The message check is not answering right now, so the agent did not read this message. Try again soon."
+# Written here, not by the model: a refused message never reaches it
+REFUSALS = {
+    "off_topic": (
+        "Maaf, aku cuma bisa bantu booking tiket bioskop di Tiketa: film, jadwal, kursi dan pesananmu. "
+        "Sorry, I can only help with cinema tickets at Tiketa."
+    ),
+    "injection": (
+        "Pesan ini terbaca seperti upaya mengubah aturan asisten, jadi tidak diteruskan. "
+        "This message reads like an attempt to change the assistant's rules, so it was not passed on."
+    ),
+}
 
 
 def is_summary(message: BaseMessage) -> bool:
@@ -113,6 +126,7 @@ class ChatService:
         budget: TokenBudget,
         daily_tokens: int,
         daily_tokens_total: int,
+        gate: Gatekeeper | None = None,
     ) -> None:
         self._agent = agent
         self._reader = reader
@@ -123,6 +137,7 @@ class ChatService:
         self._budget = budget
         self._daily_tokens = daily_tokens
         self._daily_tokens_total = daily_tokens_total
+        self._gate = gate
 
     async def start_session(self, owner: str, now: datetime) -> str:
         return await self._sessions.create(owner, now)
@@ -169,6 +184,11 @@ class ChatService:
     async def message_turn(self, session_id: str, caller: Caller, text: str, now: datetime) -> AsyncIterator[ChatEvent]:
         """The caller has begun the turn. It ends here, whatever happens."""
         try:
+            refusal = await self._refusal_for(text)
+            if refusal is not None:
+                yield refusal
+                yield ChatEvent(type="end", data=TurnUsage().as_data())
+                return
             try:
                 graph_input = await self._input_for(session_id, text)
             except Exception:  # the response has started, so the failure travels as an event
@@ -180,6 +200,24 @@ class ChatService:
                 yield event
         finally:
             await self._lock.release(f"turn:{session_id}")
+
+    async def _refusal_for(self, text: str) -> ChatEvent | None:
+        """Gatekeeper's answer to a message it blocks, or to its own silence. None lets the agent read the message."""
+        if self._gate is None:
+            return None
+        try:
+            verdict = await self._gate.verdict(text)
+        except GateUnavailable:
+            logger.exception("message check failed")
+            return ChatEvent(type="error", text=GATE_DOWN_TEXT)
+        if not verdict.blocked:
+            return None
+        reason = verdict.blocked_by if verdict.blocked_by in REFUSALS else "off_topic"
+        return ChatEvent(
+            type="message",
+            text=REFUSALS[reason],
+            data={"blocked_by": verdict.blocked_by, "gate_ms": verdict.decision_ms},
+        )
 
     async def _input_for(self, session_id: str, text: str) -> Any:
         """A new message, or the answer to the booking waiting for one, as the model reads the typed reply."""

@@ -62,8 +62,15 @@ class Settings(BaseSettings):
     # because the gateway answers in one piece
     llm_gateway_url: str = ""
     llm_gateway_api_key: SecretStr = SecretStr("")
-    # The model name the gateway is asked for. Gatekeeper takes "small" or "strong"
+    # The model name the gateway is asked for. Gatekeeper answers with its own model whatever is named
     llm_gateway_model: str = "small"
+    # Gatekeeper checks each visitor message before the agent reads it: a prompt injection or a request outside the
+    # cinema (code, recipes, poems) is refused at once, and no model is called. Empty skips the check (local runs)
+    gatekeeper_url: str = ""
+    gatekeeper_api_key: SecretStr = SecretStr("")
+    # The scope kept in Gatekeeper under this name, so its console shows the text this agent is checked against
+    gatekeeper_scope_name: str = "tiketa"
+    gatekeeper_timeout_seconds: float = Field(default=5, gt=0)
     # Model calls one turn may make. Past it the turn stops with an error instead of looping
     max_model_calls_per_turn: int = Field(default=10, gt=0)
     # Older messages are summarised once a conversation passes this many tokens
