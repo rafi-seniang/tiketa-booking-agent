@@ -51,6 +51,7 @@ seats exist and are free, what they cost, whether the showtime has started, and 
 | Long conversations | `SummarizationMiddleware` past 8,000 tokens. The draft is state, so it survives the summary |
 | Restarts, several workers | Conversations are LangGraph checkpoints in Postgres. Redis holds the rate limit (60 requests a minute per caller) and a one-turn-at-a-time lock |
 | Cost | 400,000 model tokens a day per caller and 3,000,000 for everyone together, counted in Redis. Over either, a turn gets 429 with `Retry-After` |
+| Each message checked first | `GATEKEEPER_URL`: Gatekeeper judges every visitor message against the scope it keeps as `tiketa` (`GATEKEEPER_SCOPE_NAME`). A prompt injection or an off-topic request (code, recipes, poems) gets a fixed refusal in about 0.2 s and no model call. When Gatekeeper is down the message is not read, and the chat says so |
 | A gateway in front of the model | `LLM_GATEWAY_URL` sends model calls through an OpenAI-compatible gateway such as Gatekeeper. Replies then arrive whole and thinking is off. Configured, not yet run live |
 | Seeing what happened | JSON logs with a request id, and every model call, tool call and middleware step traced to a self-hosted Phoenix |
 

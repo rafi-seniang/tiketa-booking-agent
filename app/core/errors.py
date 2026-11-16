@@ -40,6 +40,12 @@ class BookingApiUnavailable(AppError):
     status, title = 503, "Booking service unavailable"
 
 
+class GateUnavailable(AppError):
+    """Gatekeeper, which checks each message first, is down. No message reaches the agent unchecked."""
+
+    status, title = 503, "Message check unavailable"
+
+
 class Conflict(AppError):
     """The request does not fit the current state, for example a second message while a turn is running."""
 
