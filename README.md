@@ -50,9 +50,9 @@ seats exist and are free, what they cost, whether the showtime has started, and 
 | Loops and outages | 10 model calls per turn at most, retries for failed and dropped calls, an `error` event otherwise |
 | Long conversations | `SummarizationMiddleware` past 8,000 tokens. The draft is state, so it survives the summary |
 | Restarts, several workers | Conversations are LangGraph checkpoints in Postgres. Redis holds the rate limit (60 requests a minute per caller) and a one-turn-at-a-time lock |
-| Cost | 400,000 model tokens a day per caller and 3,000,000 for everyone together, counted in Redis. Over either, a turn gets 429 with `Retry-After` |
-| Each message checked first | `GATEKEEPER_URL`: Gatekeeper judges every visitor message against the scope it keeps as `tiketa` (`GATEKEEPER_SCOPE_NAME`). A prompt injection or an off-topic request (code, recipes, poems) gets a fixed refusal in about 0.2 s and no model call. When Gatekeeper is down the message is not read, and the chat says so |
-| A gateway in front of the model | `LLM_GATEWAY_URL` sends model calls through an OpenAI-compatible gateway such as Gatekeeper. Replies then arrive whole and thinking is off. Configured, not yet run live |
+| Cost | Model tokens a day per caller and for everyone together (defaults 400,000 and 3,000,000, rafilab.com uses 150,000 and 1,000,000), counted in Redis. Over either, a turn gets 429 with `Retry-After` |
+| Each message checked first | `GATEKEEPER_URL`: [Gatekeeper](https://github.com/rafi-seniang/gatekeeper-llm-gateway) judges every typed message against the scope it keeps as `tiketa` (`GATEKEEPER_SCOPE_NAME`). A prompt injection or an off-topic request (code, recipes, poems) gets a fixed refusal and no model call. The refusal is not stored in the conversation, and takes 1,000 of the day's tokens. When Gatekeeper is down the message is not read and the chat says so. Empty skips the check |
+| A gateway in front of the model | `LLM_GATEWAY_URL` sends every model call through an OpenAI-compatible gateway. Replies then arrive whole and thinking is off, so rafilab.com does not use it: the per-message check above covers the visitor's side |
 | Seeing what happened | JSON logs with a request id, and every model call, tool call and middleware step traced to a self-hosted Phoenix |
 
 Decisions: [docs/adr/0001-architecture.md](docs/adr/0001-architecture.md) (the agent loop and its rules) and
@@ -75,11 +75,9 @@ The live runs found three things no unit test had: a rate limit at the booking s
 Cancel the agent once said seats were "still set aside", and the agent wrote no sentence with any of ten summaries.
 All three are fixed. On the last run's transcript DeepEval passes 12 of 13 conversations on every check and 38 of
 38 conditions (tool use 10 of 10, reply language 13 of 13, role adherence 12 of 13). The one failure is a refusal of
-an off-topic request that took two sentences where the prompt asks for one. Earlier gradings passed 8 to 10 of 13,
-and much of that movement came from how the transcript was shown to the judge, which the evaluation notes record.
-
-On 8 November (v0.1.0, 17 turns) thinking was the difference on seats described in words: "three seats in the back
-row by the aisle" came out right 3 of 3 times with it and 1 of 3 without.
+an off-topic request that took two sentences where the prompt asks for one. Earlier gradings passed 8 to 10 of 13, and much of that movement came from how the transcript was shown to the judge
+(see the evaluation notes). On 8 November, thinking made the difference on seats described in words: "three seats in the
+back row by the aisle" came out right 3 of 3 times with it and 1 of 3 without.
 
 ## Run
 
@@ -102,7 +100,7 @@ because psycopg's async mode needs a selector event loop.
 
 Switch to Gemini with `LLM_MODEL=gemini/gemini-3.8-flash` (reads `GEMINI_API_KEY`). It is configured, not yet run live.
 
-    make check        # ruff, mypy strict, 45 tests with a scripted model and an in-memory booking service
+    make check        # ruff, mypy strict, 50 tests with a scripted model and an in-memory booking service
     make scenarios    # plays the conversations above, about 150k agent tokens, most of them read from the cache
     make evals        # grades the newest transcript with DeepEval (make evals-install once)
 

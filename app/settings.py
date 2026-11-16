@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     llm_gateway_url: str = ""
     llm_gateway_api_key: SecretStr = SecretStr("")
     # The model name the gateway is asked for. Gatekeeper answers with its own model whatever is named
-    llm_gateway_model: str = "small"
+    llm_gateway_model: str = "auto"
     # Gatekeeper checks each visitor message before the agent reads it: a prompt injection or a request outside the
     # cinema (code, recipes, poems) is refused at once, and no model is called. Empty skips the check (local runs)
     gatekeeper_url: str = ""
