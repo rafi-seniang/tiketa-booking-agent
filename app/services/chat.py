@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 STREAM_MODES: list[StreamMode] = ["messages", "updates", "custom"]
 FAILED_TURN_TEXT = "The assistant could not finish this reply. Please try again."
+# What a refused message takes from the day's tokens: no model ran, but each one cost a Jev call, so refusals
+# cannot be sent without end
+REFUSED_MESSAGE_TOKENS = 1_000
 GATE_DOWN_TEXT = "The message check is not answering right now, so the agent did not read this message. Try again soon."
 # Written here, not by the model: a refused message never reaches it
 REFUSALS = {
@@ -186,6 +189,8 @@ class ChatService:
         try:
             refusal = await self._refusal_for(text)
             if refusal is not None:
+                if refusal.type == "message":
+                    await self._budget.add(caller.name, REFUSED_MESSAGE_TOKENS)
                 yield refusal
                 yield ChatEvent(type="end", data=TurnUsage().as_data())
                 return

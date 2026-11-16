@@ -3,8 +3,9 @@ from typing import Any
 
 import httpx
 
+from app.core.token_budget import InMemoryTokenBudget
 from app.repositories.gatekeeper import Gatekeeper
-from app.services.chat import GATE_DOWN_TEXT, REFUSALS, ChatService
+from app.services.chat import GATE_DOWN_TEXT, REFUSALS, REFUSED_MESSAGE_TOKENS, ChatService
 
 from conftest import parse_events
 from fakes import ScriptedChatModel, says
@@ -58,3 +59,12 @@ async def test_the_agent_reads_nothing_unchecked_when_the_gate_is_down(
     events = await send(client, "Hai")
     assert [(event["type"], event.get("text")) for event in events][0] == ("error", GATE_DOWN_TEXT)
     assert model.received == []
+
+
+async def test_a_refused_message_takes_from_the_days_tokens(
+    client: httpx.AsyncClient, chat: ChatService, budget: InMemoryTokenBudget
+) -> None:
+    chat._gate = gate_answering("off_topic", [])
+    await send(client, "resep nasi goreng")
+    usage = (await client.get("/v1/usage")).json()
+    assert usage["used_tokens"] == REFUSED_MESSAGE_TOKENS  # no model ran, but refusals are not free to repeat
