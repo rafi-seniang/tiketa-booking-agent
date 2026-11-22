@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Multi-stage: build the app's wheel once, ship a slim image that runs as a non-root user.
-FROM python:3.12-slim AS build
+FROM python:3.15-slim AS build
 WORKDIR /src
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 COPY pyproject.toml ./
@@ -10,7 +10,7 @@ COPY alembic.ini ./
 COPY migrations ./migrations
 RUN pip wheel --wheel-dir /wheels .
 
-FROM python:3.12-slim AS runtime
+FROM python:3.15-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8060
 RUN useradd --create-home --uid 10001 app
 COPY --from=build /wheels /wheels
